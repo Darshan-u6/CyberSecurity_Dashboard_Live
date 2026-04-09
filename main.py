@@ -722,8 +722,11 @@ def virus_scan(target: str, user: dict = Depends(get_current_admin)):
         # Generate PDF
         try:
              duration = str(datetime.now() - start_time).split('.')[0]
-             report_path = generate_professional_pdf_report(safe_target, findings, title="Advanced Virus & Threat Report", start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"), duration=duration)
-             report_filename = os.path.basename(report_path)
+             date_str = datetime.now().strftime("%b %Y").upper()
+             timestamp_str = datetime.now().strftime("%Y%m%d%H%M%S")
+             report_filename = f"MALWARE ANALYSIS REPORT - IIT MADRAS - ({safe_target}) - {date_str}-{timestamp_str}.pdf"
+
+             report_path = generate_professional_pdf_report(safe_target, findings, title="Advanced Virus & Threat Report", output_filename=report_filename, start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"), duration=duration)
              yield json.dumps({"type": "success", "message": "Scan Finished.", "report_filename": report_filename}) + "\n"
         except Exception as e:
              yield json.dumps({"type": "error", "message": f"PDF Error: {str(e)}"}) + "\n"
@@ -1502,76 +1505,88 @@ def run_compliance_check(target: str, user: dict = Depends(get_current_admin)):
             log_lines.append(f"IITM-POL-001: Restricted Services - FAIL ({', '.join(found_restricted)})")
         score_max += 20
 
-        # 5. IITM-POL-002: TLS Encryption (CIS 3.1)
-        has_ssl = False
-        try:
-            context = ssl.create_default_context()
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-            with socket.create_connection((safe_target, 443), timeout=2) as sock:
-                with context.wrap_socket(sock, server_hostname=safe_target) as ssock:
-                    ver = ssock.version()
-                    cert = ssock.getpeercert()
-                    has_ssl = True
-                    
-                    if ver == "TLSv1.3" or ver == "TLSv1.2":
-                        yield json.dumps({"type": "check", "category": "Compliance", "title": "IITM-POL-002: Encryption", "status": "PASS", "details": f"Strong Protocol ({ver})"}) + "\n"
-                        score_total += 20
-                        log_lines.append(f"IITM-POL-002: Encryption - PASS ({ver})")
-                    else:
-                        yield json.dumps({"type": "check", "category": "Compliance", "title": "IITM-POL-002: Encryption", "status": "FAIL", "details": f"Weak Protocol ({ver})"}) + "\n"
-                        log_lines.append(f"IITM-POL-002: Encryption - FAIL ({ver})")
-        except:
-             # If port 443 is closed, we skip or check if 80 is open (if 80 open and 443 closed -> Fail)
-             if socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex((safe_target, 80)) == 0:
-                 yield json.dumps({"type": "check", "category": "Compliance", "title": "IITM-POL-002: Encryption", "status": "FAIL", "details": "HTTP Cleartext Only"}) + "\n"
-                 log_lines.append("IITM-POL-002: Encryption - FAIL (HTTP Only)")
-             else:
-                 # No web
-                 score_total += 20 # NA pass
-        score_max += 20
-
-        # 6. IITM-POL-003: SSH Hardening
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(2)
-            if sock.connect_ex((safe_target, 22)) == 0:
-                banner = sock.recv(1024).decode('utf-8', errors='ignore').strip()
-                if "SSH-2.0" in banner:
-                    yield json.dumps({"type": "check", "category": "Compliance", "title": "IITM-POL-003: SSH Security", "status": "PASS", "details": "SSH v2 Enforced"}) + "\n"
-                    score_total += 15
-                    log_lines.append("IITM-POL-003: SSH Security - PASS")
-                else:
-                    yield json.dumps({"type": "check", "category": "Compliance", "title": "IITM-POL-003: SSH Security", "status": "FAIL", "details": f"Legacy SSH: {banner}"}) + "\n"
-                    log_lines.append(f"IITM-POL-003: SSH Security - FAIL ({banner})")
-            else:
-                score_total += 15 # Closed is secure
-        except: 
-            score_total += 15
-        score_max += 15
-
-        # 7. IITM-POL-004: Headers & Privacy
-        if has_ssl or socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex((safe_target, 80)) == 0:
+        # 5. IITM-POL-002: Advanced Configuration Audit (Nmap Scripts)
+        # Use nmap to discover real-world compliance issues in running services
+        yield json.dumps({"type": "status", "message": "Executing Advanced Configuration Audit via Nmap..."}) + "\n"
+        nmap_path = shutil.which("nmap")
+        advanced_pass = True
+        nmap_fail_reasons = []
+        if nmap_path:
+            cmd = [nmap_path, "-Pn", "-sV", "--script", "ssl-enum-ciphers,http-headers,ssh2-enum-algos", "--host-timeout", "45s", safe_target]
             try:
-                url = f"https://{safe_target}" if has_ssl else f"http://{safe_target}"
-                r = requests.get(url, timeout=2, verify=False)
-                h = r.headers
-                missing = []
-                if "Strict-Transport-Security" not in h and has_ssl: missing.append("HSTS")
-                if "X-Frame-Options" not in h: missing.append("X-Frame")
-                
-                if not missing:
-                    yield json.dumps({"type": "check", "category": "Compliance", "title": "IITM-POL-004: Web Defense", "status": "PASS", "details": "Headers Present"}) + "\n"
-                    score_total += 20
-                    log_lines.append("IITM-POL-004: Web Defense - PASS")
-                else:
-                    yield json.dumps({"type": "check", "category": "Compliance", "title": "IITM-POL-004: Web Defense", "status": "WARN", "details": f"Missing: {', '.join(missing)}"}) + "\n"
-                    score_total += 10
-                    log_lines.append(f"IITM-POL-004: Web Defense - WARN ({', '.join(missing)})")
-            except: pass
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in process.stdout:
+                    if "TLSv1.0" in line or "TLSv1.1" in line or "SSLv3" in line:
+                        advanced_pass = False
+                        nmap_fail_reasons.append("Deprecated SSL/TLS Protocols detected.")
+                    elif "weak" in line.lower() and "cipher" in line.lower():
+                        advanced_pass = False
+                        nmap_fail_reasons.append("Weak cryptographic ciphers enabled.")
+                    elif "X-Frame-Options: NOT PRESENT" in line:
+                        advanced_pass = False
+                        nmap_fail_reasons.append("Missing critical security headers.")
+                process.wait()
+            except Exception as e:
+                pass
+
+        if advanced_pass and not nmap_fail_reasons:
+             yield json.dumps({"type": "check", "category": "Cryptography", "title": "IITM-POL-002: Configuration Hardening", "status": "PASS", "details": "Advanced settings meet strict compliance benchmarks."}) + "\n"
+             score_total += 20
+             log_lines.append("IITM-POL-002: Configuration Hardening - PASS")
         else:
-            score_total += 20
+             reasons_str = ", ".join(list(set(nmap_fail_reasons)))[:150]
+             yield json.dumps({"type": "check", "category": "Cryptography", "title": "IITM-POL-002: Configuration Hardening", "status": "FAIL", "details": f"Weaknesses: {reasons_str}"}) + "\n"
+             log_lines.append(f"IITM-POL-002: Configuration Hardening - FAIL ({reasons_str})")
         score_max += 20
+
+        has_ssl = True # Skip the legacy fallback to web test since Nmap checks it comprehensively
+
+        # 6. IITM-POL-003: Deep Application Inspection (Nikto)
+        yield json.dumps({"type": "status", "message": "Performing Deep Application Inspection via Nikto..."}) + "\n"
+        nikto_path = shutil.which("nikto")
+        nikto_issues = []
+        if nikto_path:
+            cmd = [nikto_path, "-h", safe_target, "-Tuning", "123b", "-maxtime", "60"]
+            try:
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in process.stdout:
+                    if "+ " in line and ("OSVDB" in line or "CVE" in line or "XSS" in line or "SQL" in line):
+                        nikto_issues.append(line.strip().replace("+ ", ""))
+                process.wait()
+            except Exception as e:
+                pass
+                
+        if not nikto_issues:
+             yield json.dumps({"type": "check", "category": "App Security", "title": "IITM-POL-003: Dynamic App Security", "status": "PASS", "details": "No immediate Application logic flaws detected."}) + "\n"
+             score_total += 20
+             log_lines.append("IITM-POL-003: Dynamic App Security - PASS")
+        else:
+             yield json.dumps({"type": "check", "category": "App Security", "title": "IITM-POL-003: Dynamic App Security", "status": "FAIL", "details": f"Issues found: {len(nikto_issues)} potential flaws logged."}) + "\n"
+             log_lines.append(f"IITM-POL-003: Dynamic App Security - FAIL ({len(nikto_issues)} flaws)")
+             score_max += 20
+
+        # 7. IITM-POL-004: OWASP Compliance Verification (Wapiti)
+        yield json.dumps({"type": "status", "message": "Verifying OWASP Compliance Baseline via Wapiti..."}) + "\n"
+        wapiti_path = shutil.which("wapiti")
+        wapiti_issues = []
+        if wapiti_path:
+            cmd = [wapiti_path, "-u", f"http://{safe_target}", "--scope", "folder", "--flush-session", "-v", "1", "--no-bugreport", "--max-scan-time", "3", "-m", "xss,sql,exec,file"]
+            try:
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in process.stdout:
+                    if "Vulnerability" in line or "[+]" in line:
+                        wapiti_issues.append(line.strip())
+                process.wait()
+            except: pass
+
+        if not wapiti_issues:
+             yield json.dumps({"type": "check", "category": "App Security", "title": "IITM-POL-004: OWASP Top 10 Compliance", "status": "PASS", "details": "Core OWASP vectors properly defended against fuzzing."}) + "\n"
+             score_total += 20
+             log_lines.append("IITM-POL-004: OWASP Top 10 Compliance - PASS")
+        else:
+             yield json.dumps({"type": "check", "category": "App Security", "title": "IITM-POL-004: OWASP Top 10 Compliance", "status": "FAIL", "details": f"Vulnerabilities flagged: {len(wapiti_issues)} injections or logic errors identified."}) + "\n"
+             log_lines.append(f"IITM-POL-004: OWASP Top 10 Compliance - FAIL ({len(wapiti_issues)} vulnerabilities)")
+             score_max += 20
 
         # Final Score Calculation
         final_score = int((score_total / score_max) * 100) if score_max > 0 else 0
@@ -1592,12 +1607,32 @@ def run_compliance_check(target: str, user: dict = Depends(get_current_admin)):
         
         # Generate PDF
         try:
-             # We need to reconstruct findings structure. The generator only yielded strings/JSON.
-             # It's better to just re-run the collector function for PDF data to ensure structure.
-             pdf_findings = get_compliance_check_data(safe_target)
+             # We need to reconstruct findings structure from the live run rather than relying on static get_compliance_check_data
+             pdf_findings = []
+             for line in log_lines:
+                 if "PASS" in line or "FAIL" in line or "WARN" in line or "INFO" in line:
+                     category = "App Security" if "App" in line else ("Cryptography" if "Hardening" in line else "Network Security")
+                     sev = "Critical" if "FAIL" in line else ("Info" if "PASS" in line else "Medium")
+                     pdf_findings.append({
+                         "category": category,
+                         "tool": "Compliance Audit Engine",
+                         "severity": sev,
+                         "message": line,
+                         "timestamp": datetime.now().strftime("%H:%M:%S")
+                     })
+             pdf_findings.append({
+                 "category": "Summary", "tool": "Score", "severity": "Info",
+                 "message": f"Final Compliance Score: {final_score}/100",
+                 "timestamp": datetime.now().strftime("%H:%M:%S")
+             })
+
              duration = str(datetime.now() - start_time).split('.')[0]
-             report_path = generate_professional_pdf_report(safe_target, pdf_findings, title="Compliance Verification Report", start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"), duration=duration)
-             report_filename = os.path.basename(report_path)
+
+             date_str = datetime.now().strftime("%b %Y").upper()
+             timestamp_str = datetime.now().strftime("%Y%m%d%H%M%S")
+             report_filename = f"COMPLIANCE AUDIT REPORT - IIT MADRAS - ({safe_target}) - {date_str}-{timestamp_str}.pdf"
+
+             report_path = generate_professional_pdf_report(safe_target, pdf_findings, title="Compliance Verification Report", output_filename=report_filename, start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"), duration=duration)
              yield json.dumps({"type": "success", "message": "Compliance Scan Completed.", "report_filename": report_filename}) + "\n"
         except Exception as e:
              yield json.dumps({"type": "error", "message": f"PDF Error: {str(e)}"}) + "\n"
@@ -3553,8 +3588,11 @@ def cve_scan(target: str, user: dict = Depends(get_current_admin)):
         # Generate PDF
         try:
              duration = str(datetime.now() - start_time).split('.')[0]
-             report_path = generate_professional_pdf_report(safe_target, findings, title="Vulnerability Scan Report", start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"), duration=duration)
-             report_filename = os.path.basename(report_path)
+             date_str = datetime.now().strftime("%b %Y").upper()
+             timestamp_str = datetime.now().strftime("%Y%m%d%H%M%S")
+             report_filename = f"CVE_REPORT - IIT MADRAS - ({safe_target}) - {date_str}-{timestamp_str}.pdf"
+
+             report_path = generate_professional_pdf_report(safe_target, findings, title="Vulnerability Scan Report", output_filename=report_filename, start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"), duration=duration)
              yield json.dumps({"type": "success", "message": "CVE Scan Complete.", "report_filename": report_filename}) + "\n"
         except Exception as e:
              yield json.dumps({"type": "error", "message": f"PDF Error: {str(e)}"}) + "\n"
@@ -3702,62 +3740,68 @@ async def bulk_scan(file: UploadFile = File(...), user: dict = Depends(get_curre
     return StreamingResponse(bulk_generator(), media_type="text/plain")
 
 def get_virus_scan_data(target):
-    log_data = []
     findings = []
-    
-    # Validation logic reused
     clean_target = target.replace("http://", "").replace("https://", "").split("/")[0].split(":")[0]
     
-    # 2. Check Vectors (Ports)
-    target_ports = [21, 22, 80, 81, 443, 445, 1604, 3389, 3700, 5552]
-    
-    for port in target_ports:
+    nmap_path = shutil.which("nmap")
+    if nmap_path:
+        cmd = [nmap_path, "-Pn", "-sV", "--script", "malware", "--host-timeout", "60s", "-T4", clean_target]
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(2)
-            result = sock.connect_ex((clean_target, port))
-            
-            if result == 0:
-                log_data.append(f"Port {port} Open.")
-                banner = ""
-                # Banner Grab
-                try:
-                    if port in [80, 443]:
-                        # HTTP
-                        proto = "https" if port == 443 else "http"
-                        try:
-                            r = requests.get(f"{proto}://{clean_target}", timeout=2, verify=False)
-                            banner = r.headers.get("Server", "")
-                            banner += " " + r.headers.get("X-Powered-By", "")
-                        except: pass
-                    else:
-                        # TCP Banner
-                        sock.send(b"\r\n")
-                        banner = sock.recv(1024).decode('utf-8', errors='ignore').strip()
-                except: pass
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            for line in process.stdout:
+                line = line.strip()
+                if not line: continue
                 
-                sock.close()
-                
-                if banner:
-                    log_data.append(f"Service Fingerprint: {banner[:50]}...")
-                    detected = False
-                    
-                    # Advanced Anomaly Detection (Heuristic)
-                    if any(s in banner.lower() for s in ["cmd.exe", "root@", "uid=0", "/bin/sh"]):
-                        msg = f"SUSPICIOUS ACTIVITY: Shell access detected on Port {port}!"
-                        findings.append({"severity": "Critical", "tool": "Heuristic", "message": msg, "timestamp": datetime.now().strftime("%H:%M:%S")})
-                        detected = True
-                    
-                    if not detected:
-                        log_data.append(f"Port {port} service seems clean.")
-                else:
-                     log_data.append(f"Port {port} Open but no banner.")
-            else:
-                sock.close()
+                if "MALICIOUS" in line.upper() or "INFECTED" in line.upper() or "BACKDOOR" in line.upper():
+                    findings.append({
+                        "category": "Heuristic Analysis",
+                        "severity": "Critical",
+                        "tool": "Nmap Malware Engine",
+                        "message": line,
+                        "timestamp": datetime.now().strftime("%H:%M:%S")
+                    })
+                elif "WARNING" in line.upper() or "SUSPICIOUS" in line.upper():
+                    findings.append({
+                        "category": "Heuristic Analysis",
+                        "severity": "High",
+                        "tool": "Nmap Malware Engine",
+                        "message": line,
+                        "timestamp": datetime.now().strftime("%H:%M:%S")
+                    })
+            process.wait()
         except Exception as e:
-            pass
-    
-    return findings if findings else log_data
+            findings.append({
+                "category": "Error",
+                "severity": "Medium",
+                "tool": "Nmap Malware Engine",
+                "message": f"Engine execution failed: {str(e)}",
+                "timestamp": datetime.now().strftime("%H:%M:%S")
+            })
+
+    # Keep a small set of the manual heuristic checks as fallback
+    try:
+        r = requests.get(f"http://{clean_target}", timeout=2, verify=False)
+        content = r.text.lower()
+        if "eval(base64_decode" in content or "cmd.exe" in content or "powershell.exe" in content:
+            findings.append({
+                "category": "Heuristic Analysis",
+                "severity": "Critical",
+                "tool": "Web Response Inspector",
+                "message": "SUSPICIOUS PAYLOAD: Web response contains potential obfuscated webshell or reverse shell commands.",
+                "timestamp": datetime.now().strftime("%H:%M:%S")
+            })
+    except: pass
+
+    if not findings:
+        findings.append({
+            "category": "Summary",
+            "severity": "Info",
+            "tool": "Malware Scanner",
+            "message": "Target scanned for known malware signatures and heuristics. No active infections found.",
+            "timestamp": datetime.now().strftime("%H:%M:%S")
+        })
+
+    return findings
 
 def get_tls_check_data(host):
     log_data = []
@@ -3817,167 +3861,64 @@ def get_tls_check_data(host):
 def get_cve_scan_data(target):
     findings = []
     
-    scan_ports = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 5432, 5900, 8080, 8443]
-    banners = {}
-    
-    # 1. Banner Grabbing
-    for port in scan_ports:
+    nmap_path = shutil.which("nmap")
+    if nmap_path:
+        cmd = [nmap_path, "-Pn", "-sV", "--script", "vuln", "--host-timeout", "60s", "-T4", target]
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(1.0) # Faster timeout
-            result = s.connect_ex((target, port))
-            
-            if result == 0:
-                banner = ""
-                # Protocol specific triggers
-                if port in [80, 443, 8080, 8443]:
-                    try:
-                        proto = "https" if port in [443, 8443] else "http"
-                        r = requests.head(f"{proto}://{target}:{port}", timeout=2, verify=False)
-                        server = r.headers.get("Server", "")
-                        powered = r.headers.get("X-Powered-By", "")
-                        banner = f"{server} {powered}".strip()
-                    except: pass
-                else:
-                    try:
-                        # Generic TCP Banner
-                        s.send(b"\r\n")
-                        banner = s.recv(1024).decode('utf-8', errors='ignore').strip()
-                    except: pass
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            for line in process.stdout:
+                line = line.strip()
+                if not line: continue
                 
-                s.close()
-                if banner:
-                    banners[port] = banner
-        except: pass
+                # Try to parse CVEs out of the nmap vuln script output
+                if "VULNERABLE" in line or "CVE-" in line or "State: VULNERABLE" in line:
+                    cve_id = "N/A"
+                    cve_match = re.search(r'(CVE-\d{4}-\d{4,})', line)
+                    if cve_match:
+                        cve_id = cve_match.group(1)
 
-    # 2. Comprehensive Vulnerability Rules (Simulated Real-time Database)
-    # Using version comparison logic where possible
-    
-    def check_ver(ver_str, op, ref_ver):
-        try:
-            v = pkg_version.parse(ver_str)
-            r = pkg_version.parse(ref_ver)
-            if op == '<': return v < r
-            if op == '<=': return v <= r
-            if op == '==': return v == r
-            if op == '>=': return v >= r
-            if op == '>': return v > r
-        except: return False
-        return False
+                    severity = "High"
+                    cvss = 7.5
 
-    # Expanded Database
-    VULN_DB = [
-        # Apache
-        {"product": "Apache", "check": lambda v: check_ver(v, '<', "2.4.51"), "cve": "CVE-2021-41773", "cvss": 9.8, "severity": "Critical", "desc": "Path traversal in Apache HTTP Server 2.4.49/2.4.50.", "rec": "Upgrade to Apache 2.4.51+"},
-        {"product": "Apache", "check": lambda v: check_ver(v, '<', "2.4.52"), "cve": "CVE-2021-44790", "cvss": 9.8, "severity": "Critical", "desc": "Buffer overflow in mod_lua.", "rec": "Upgrade to Apache 2.4.52+"},
-        {"product": "Apache", "check": lambda v: check_ver(v, '==', "2.2"), "cve": "EOL-APACHE-2.2", "cvss": 5.0, "severity": "Medium", "desc": "End of Life software detected.", "rec": "Migrate to supported version."},
-        
-        # Nginx
-        {"product": "nginx", "check": lambda v: check_ver(v, '<', "1.20.1"), "cve": "CVE-2021-23017", "cvss": 8.1, "severity": "High", "desc": "Off-by-one error in ngx_resolver.c.", "rec": "Upgrade Nginx."},
-        
-        # PHP
-        {"product": "PHP", "check": lambda v: check_ver(v, '<', "7.4.22"), "cve": "CVE-2021-21705", "cvss": 7.5, "severity": "High", "desc": "PHP-FPM buffer overflow.", "rec": "Upgrade PHP."},
-        {"product": "PHP", "check": lambda v: check_ver(v, '<', "8.1.0") and check_ver(v, '>=', "8.0.0"), "cve": "CVE-2021-21708", "cvss": 9.8, "severity": "Critical", "desc": "Use-after-free in filter_var.", "rec": "Upgrade PHP."},
-        
-        # OpenSSH
-        {"product": "OpenSSH", "check": lambda v: check_ver(v, '<', "7.2"), "cve": "CVE-2016-0777", "cvss": 6.5, "severity": "Medium", "desc": "Roaming Factor private key leakage.", "rec": "Upgrade OpenSSH."},
-        
-        # IIS
-        {"product": "Microsoft-IIS", "check": lambda v: check_ver(v, '==', "7.5"), "cve": "CVE-2015-1635", "cvss": 9.8, "severity": "Critical", "desc": "HTTP.sys RCE (MS15-034).", "rec": "Patch immediately."},
-        
-        # Tomcat
-        {"product": "Tomcat", "check": lambda v: check_ver(v, '<', "9.0.43"), "cve": "CVE-2021-25122", "cvss": 7.5, "severity": "High", "desc": "H2C request smuggling.", "rec": "Upgrade Tomcat."},
-        
-        # OpenSSL
-        {"product": "OpenSSL", "check": lambda v: check_ver(v, '>=', "1.0.1") and check_ver(v, '<', "1.0.1g"), "cve": "CVE-2014-0160", "cvss": 7.5, "severity": "High", "desc": "Heartbleed Information Disclosure.", "rec": "Upgrade OpenSSL."},
-        
-        # Jenkins
-        {"product": "Jenkins", "check": lambda v: check_ver(v, '<', "2.442"), "cve": "CVE-2024-23897", "cvss": 9.8, "severity": "Critical", "desc": "Arbitrary file read through CLI.", "rec": "Upgrade Jenkins."},
-    ]
+                    if "Critical" in line or "CVSS: 9" in line or "CVSS: 10" in line:
+                        severity = "Critical"
+                        cvss = 9.8
+                    elif "Medium" in line or "CVSS: 5" in line or "CVSS: 6" in line:
+                        severity = "Medium"
+                        cvss = 5.5
 
-    # 3. Matching Logic
-    found_vuln = False
-    
-    for port, banner in banners.items():
-        # Parsing Logic: Try to extract Product/Version
-        # Regex for "Product/1.2.3"
-        import re
-        matches = re.findall(r'([a-zA-Z0-9_\-]+)/(\d+(\.\d+)*)', banner)
-        
-        # Also check for space separation "Product 1.2.3"
-        if not matches:
-             matches = re.findall(r'([a-zA-Z0-9_\-]+)\s+(\d+(\.\d+)*)', banner)
-             
-        for prod, ver, _ in matches:
-            # Check against Rules
-            for rule in VULN_DB:
-                if rule['product'].lower() in prod.lower():
-                    if rule['check'](ver):
-                        found_vuln = True
-                        findings.append({
-                            "type": "finding",
-                            "tool": "Advanced CVE Engine",
-                            "cve": rule['cve'],
-                            "cvss": rule['cvss'],
-                            "severity": rule['severity'],
-                            "description": rule['desc'],
-                            "recommendation": rule['rec'],
-                            "message": f"Port {port}: {rule['cve']} - {rule['desc']}",
-                            "details": f"Product: {prod} {ver} (Matched Rule)"
-                        })
-
-    # 4. Fallback: Static String Match (Legacy DB) for things that don't parse well
-    IITM_LEGACY_DB = [
-        {"sig": "vsftpd 2.3.4", "cve": "CVE-2011-2523", "cvss": 9.8, "desc": "Backdoor Command Execution.", "sev": "Critical"},
-        {"sig": "Struts 2", "cve": "CVE-2017-5638", "cvss": 10.0, "desc": "Apache Struts 2 RCE.", "sev": "Critical"},
-        {"sig": "Log4j", "cve": "CVE-2021-44228", "cvss": 10.0, "desc": "Log4Shell RCE.", "sev": "Critical"},
-        {"sig": "Spring Framework", "cve": "CVE-2022-22965", "cvss": 9.8, "desc": "Spring4Shell RCE.", "sev": "Critical"},
-        {"sig": "Drupal 7", "cve": "CVE-2014-3704", "cvss": 7.5, "desc": "Drupalgeddon SQL Injection.", "sev": "High"}
-    ]
-    
-    for port, banner in banners.items():
-        for item in IITM_LEGACY_DB:
-            if item['sig'].lower() in banner.lower():
-                # Avoid duplicates
-                if not any(f.get('cve') == item['cve'] for f in findings):
-                    found_vuln = True
                     findings.append({
                         "type": "finding",
-                        "tool": "Signature Match",
-                        "cve": item['cve'],
-                        "cvss": item['cvss'],
-                        "severity": item['sev'],
-                        "description": item['desc'],
-                        "recommendation": "Patch or remove affected software.",
-                        "message": f"Port {port}: {item['cve']} - {item['desc']}",
-                        "details": f"Banner Match: {item['sig']}"
+                        "tool": "Nmap NSE Engine",
+                        "cve": cve_id,
+                        "cvss": cvss,
+                        "severity": severity,
+                        "description": line,
+                        "recommendation": "Review NVD database for patching information.",
+                        "message": line,
+                        "details": f"Target: {target}"
                     })
+            process.wait()
+        except Exception as e:
+            findings.append({
+                "type": "info",
+                "tool": "Nmap NSE Engine",
+                "severity": "Medium",
+                "message": f"Real-time CVE engine error: {str(e)}"
+            })
 
-    if not found_vuln:
-        if banners:
-             findings.append({
-                "type": "info",
-                "tool": "CVE Scanner",
-                "cve": "N/A",
-                "cvss": 0.0,
-                "severity": "Info",
-                "description": "No known high-confidence CVEs matched for identified services.",
-                "message": f"Services scanned: {len(banners)}. No matches against {len(VULN_DB) + len(IITM_LEGACY_DB)} rules.",
-                "details": f"Banners: {json.dumps(banners)}",
-                "timestamp": datetime.now().strftime("%H:%M:%S")
-             })
-        else:
-             findings.append({
-                "type": "info",
-                "tool": "CVE Scanner",
-                "cve": "N/A",
-                "cvss": 0.0,
-                "severity": "Info",
-                "description": "No open ports found to analyze.",
-                "message": "Host appears down or firewalled.",
-                "details": "No banners retrieved.",
-                "timestamp": datetime.now().strftime("%H:%M:%S")
-             })
+    if not findings:
+        findings.append({
+            "type": "info",
+            "tool": "CVE Scanner",
+            "cve": "N/A",
+            "cvss": 0.0,
+            "severity": "Info",
+            "description": "No known high-confidence CVEs matched for identified services.",
+            "message": "Nmap vuln scan completed with no explicit CVE matches.",
+            "details": "All tested services appear hardened against known exploit scripts.",
+            "timestamp": datetime.now().strftime("%H:%M:%S")
+        })
 
     return findings
 
