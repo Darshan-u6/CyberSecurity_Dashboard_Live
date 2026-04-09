@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IIT Madras - Cybersecurity Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="/static/css/modern_dashboard_styles.css" rel="stylesheet">
+    <style>
+        /* Specific overrides for this page if needed */
+        .sidebar-brand-text {
+            color: #fff;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:2000; justify-content:center; align-items:center; flex-direction:column;">
+    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <h5 class="mt-3 text-dark">Processing Request...</h5>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-header d-flex flex-column align-items-center text-center">
+        <img src="/static/img/iitm_logo.png" alt="IITM Logo" style="width: 50px; height: auto; margin-bottom: 10px; background: white; border-radius: 50%; padding: 2px;">
+        <h6 class="mb-0 sidebar-brand-text">P.G. Senapathy Center</h6>
+        <small class="text-white-50" style="font-size: 0.75rem;">Computing Resources</small>
+        <div class="mt-2 badge bg-white text-dark small" id="userDisplay">Guest</div>
+    </div>
+    <div class="list-group list-group-flush mt-2 w-100">
+        <a href="#" onclick="showSection('dashboard')" class="nav-link active"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+        <a href="#" onclick="showSection('portScanner')" class="nav-link"><i class="fas fa-network-wired"></i> Port Scanner</a>
+        <a href="#" onclick="showSection('ipScanner')" class="nav-link"><i class="fas fa-globe"></i> IP Range Scanner</a>
+        <a href="#" onclick="showSection('networkMonitor')" class="nav-link"><i class="fas fa-eye"></i> Network Monitor</a>
+        <a href="#" onclick="showSection('vapt')" class="nav-link"><i class="fas fa-bug"></i> VAPT Report</a>
+        <a href="#" onclick="showSection('compliance')" class="nav-link"><i class="fas fa-check-circle"></i> Compliance</a>
+        <a href="#" onclick="showSection('virusScanner')" class="nav-link"><i class="fas fa-shield-virus"></i> Virus Scanner</a>
+        <a href="#" onclick="showSection('cveScanner')" class="nav-link"><i class="fas fa-search-dollar"></i> CVE Scanner</a>
+        <a href="#" onclick="showSection('tlsChecker')" class="nav-link"><i class="fas fa-lock"></i> TLS Checker</a>
+        <a href="#" onclick="showSection('bulkScanner')" class="nav-link"><i class="fas fa-file-csv"></i> Bulk Scanner</a>
+        
+        <div class="mt-3 px-3 text-uppercase small text-white-50 fw-bold" style="font-size: 0.7rem;">Administration</div>
+        <a href="#" onclick="showSection('adminPanel')" id="adminLink" class="nav-link active"><i class="fas fa-user-shield"></i> Admin Console</a>
+        
+        <a href="#" onclick="logout()" class="nav-link mt-3 border-top border-secondary"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+    <!-- Mobile Navbar -->
+    <nav class="navbar navbar-light bg-white shadow-sm d-lg-none mb-4 rounded px-3">
+        <div class="d-flex align-items-center">
+            <button class="btn btn-outline-secondary btn-sm me-3" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+            <span class="navbar-brand mb-0 h6 fw-bold text-dark">IITM Security</span>
+        </div>
+    </nav>
+
+    <!-- Sections -->
+    <div id="contentArea">
+        
+        <!-- Dashboard Home -->
+        <div id="dashboard" class="section">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4 class="mb-1 fw-bold text-brand-primary">Security Operations Center</h4>
+                    <p class="text-muted small mb-0">IIT Madras Network Defence | <span id="clock" class="font-monospace"></span></p>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="text-end">
+                        <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 1px;">Threat Level</small>
+                        <h4 class="mb-0 fw-bold" id="dash_threat_level">ANALYZING...</h4>
+                    </div>
+                    <div class="rounded-circle p-1 bg-danger pulse-ring">
+                        <div class="bg-danger rounded-circle" style="width: 15px; height: 15px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Command Center Stats -->
+            <div class="row g-4 mb-4">
+                <!-- Malware Threats -->
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card border-0 shadow-sm h-100 bg-gradient-danger text-white position-relative overflow-hidden">
+                        <div class="card-body position-relative z-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="text-white-50 text-uppercase small fw-bold">Active Intrusions</h6>
+                                    <h2 class="fw-bold mb-0 mt-2" id="dash_intrusions">0</h2>
+                                </div>
+                                <i class="fas fa-biohazard fa-2x text-white-50"></i>
+                            </div>
+                            <div class="mt-3 small text-white-50">
+                                <i class="fas fa-arrow-up me-1"></i> Critical Alerts
+                            </div>
+                        </div>
+                        <!-- Decor -->
+                        <div class="position-absolute" style="top: -20px; right: -20px; width: 100px; height: 100px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+                    </div>
+                </div>
+
+                <!-- Active Scans -->
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h6 class="text-muted text-uppercase small fw-bold mb-0">Scan Operations</h6>
+                                </div>
+                                <span class="badge bg-primary bg-opacity-10 text-primary">RUNNING</span>
+                            </div>
+                            <h2 class="fw-bold text-dark mb-1" id="dash_active_scans">0</h2>
+                            <small class="text-muted">Tasks in Progress</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reports -->
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h6 class="text-muted text-uppercase small fw-bold mb-0">Reports Generated</h6>
+                                </div>
+                                <span class="badge bg-success bg-opacity-10 text-success">READY</span>
+                            </div>
+                            <h2 class="fw-bold text-dark mb-1" id="reportsCount">0</h2>
+                            <small class="text-muted">Available for Download</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Health -->
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card border-0 shadow-sm h-100 border-start border-4 border-info">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h6 class="text-muted text-uppercase small fw-bold mb-0">System Health</h6>
+                                </div>
+                                <span class="badge bg-info bg-opacity-10 text-info">OPTIMAL</span>
+                            </div>
+                            <h2 class="fw-bold text-dark mb-1">99.9%</h2>
+                            <small class="text-muted">Uptime (Last 30 days)</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Layout Grid -->
+            <div class="row g-4 mb-4">
+                <!-- Left Column: Traffic & Threats -->
+                <div class="col-lg-8">
+                    <!-- Traffic Chart -->
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
+                            <h6 class="mb-0 text-dark fw-bold"><i class="fas fa-chart-area me-2 text-primary"></i>Network Traffic Anomaly Detection</h6>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-light text-dark active">Live</button>
+                                <button class="btn btn-outline-light text-muted">1H</button>
+                                <button class="btn btn-outline-light text-muted">24H</button>
+                            </div>
+                        </div>
+                        <div class="card-body pt-0">
+                            <canvas id="trafficChart" height="250"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Module Status Grid -->
+                    <h6 class="text-dark fw-bold mb-3">Operational Modules</h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100 text-center p-3 hover-lift" onclick="showSection('virusScanner')" style="cursor: pointer;">
+                                <div class="mb-2 text-danger"><i class="fas fa-shield-virus fa-2x"></i></div>
+                                <h6 class="fw-bold text-dark mb-1">Virus Scanner</h6>
+                                <small class="text-muted d-block">Signature & Heuristic</small>
+                                <span class="badge bg-light text-dark border mt-2">Ready</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100 text-center p-3 hover-lift" onclick="showSection('networkMonitor')" style="cursor: pointer;">
+                                <div class="mb-2 text-primary"><i class="fas fa-network-wired fa-2x"></i></div>
+                                <h6 class="fw-bold text-dark mb-1">Net Monitor</h6>
+                                <small class="text-muted d-block">Asset Discovery</small>
+                                <span class="badge bg-light text-dark border mt-2">Active</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100 text-center p-3 hover-lift" onclick="showSection('vapt')" style="cursor: pointer;">
+                                <div class="mb-2 text-warning"><i class="fas fa-bug fa-2x"></i></div>
+                                <h6 class="fw-bold text-dark mb-1">VAPT Engine</h6>
+                                <small class="text-muted d-block">Vuln Assessment</small>
+                                <span class="badge bg-light text-dark border mt-2">Idle</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100 text-center p-3 hover-lift" onclick="showSection('compliance')" style="cursor: pointer;">
+                                <div class="mb-2 text-success"><i class="fas fa-clipboard-check fa-2x"></i></div>
+                                <h6 class="fw-bold text-dark mb-1">Compliance</h6>
+                                <small class="text-muted d-block">Audit & Policy</small>
+                                <span class="badge bg-light text-dark border mt-2">Ready</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Feeds & Status -->
+                <div class="col-lg-4">
+                    <!-- Zone Status -->
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white py-3 border-bottom-0">
+                            <h6 class="mb-0 text-dark fw-bold">Infrastructure Zones</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush" id="zone_status_list">
+                                <div class="p-4 text-center text-muted small">Loading Zone Data...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Alerts -->
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
+                            <h6 class="mb-0 text-dark fw-bold">Live Threat Feed</h6>
+                            <span class="badge bg-danger bg-opacity-10 text-danger pulse">LIVE</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush" id="liveAlertsFeed" style="max-height: 400px; overflow-y: auto;">
+                                <div class="p-4 text-center text-muted small">System initialized. Monitoring...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Port Scanner -->
+        <div id="portScanner" class="section d-none">
+            <h4 class="mb-3 text-dark">Port Scanner</h4>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-5">
+                            <label class="form-label small text-muted">Target Host</label>
+                            <input type="text" class="form-control" id="ps_ip" placeholder="e.g., 10.21.200.55">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small text-muted">Ports</label>
+                            <input type="text" class="form-control" id="ps_ports" placeholder="80, 443, 22-25">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button class="btn btn-primary w-100" onclick="runPortScan()">Start Scan</button>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                         <div class="alert alert-light border small mb-0 w-100 me-3" id="ps_status"><i class="fas fa-info-circle me-2"></i> Ready to scan</div>
+                         <button id="ps_download_btn" class="btn btn-sm btn-success d-none" onclick=""><i class="fas fa-download me-1"></i> Report</button>
+                    </div>
+                    
+                    <div class="table-responsive rounded border">
+                        <table class="table table-hover mb-0 bg-white">
+                            <thead class="table-light"><tr><th>Port</th><th>State</th><th>Service</th></tr></thead>
+                            <tbody id="ps_table_body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IP Range Scanner -->
+        <div id="ipScanner" class="section d-none">
+            <h4 class="mb-3 text-dark">IP Range Scanner</h4>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <label class="form-label small text-muted">Network Range</label>
+                    <div class="input-group mb-4">
+                        <input type="text" class="form-control" id="ir_range" placeholder="StartIP - EndIP (e.g. 10.21.0.1-10.21.0.50)">
+                        <button class="btn btn-primary" onclick="runIPRangeScan()">Scan Range</button>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                         <div class="alert alert-light border small mb-0 w-100 me-3" id="ir_status"><i class="fas fa-info-circle me-2"></i> Ready</div>
+                         <button id="ir_download_btn" class="btn btn-sm btn-success d-none" onclick=""><i class="fas fa-download me-1"></i> Report</button>
+                    </div>
+                    <div class="table-responsive rounded border" style="max-height: 500px;">
+                        <table class="table table-hover mb-0 bg-white">
+                            <thead class="table-light"><tr><th>IP Address</th><th>Status</th><th>Hostname & OS</th></tr></thead>
+                            <tbody id="ir_table_body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Monitor -->
+        <div id="networkMonitor" class="section d-none">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0 text-dark">Network Monitor </h4>
+                <div class="d-flex gap-4">
+                    <div class="text-end">
+                        <small class="text-muted d-block text-uppercase" style="font-size:0.7rem;">Active Assets</small>
+                        <h5 class="mb-0 text-dark fw-bold" id="nm_stats_total">0</h5>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted d-block text-uppercase" style="font-size:0.7rem;">Critical Threats</small>
+                        <h5 class="mb-0 text-danger fw-bold pulse" id="nm_stats_critical">0</h5>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted d-block text-uppercase" style="font-size:0.7rem;">Health Score</small>
+                        <h5 class="mb-0 text-success fw-bold" id="nm_stats_health">100%</h5>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Zone Control Panel -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-2">
+                    <div class="card h-100 border text-center p-3 hover-shadow" role="button" onclick="runZoneScan('Computer Center', '10.21.200.1-10.21.203.255')">
+                        <div class="mb-2 text-primary"><i class="fas fa-desktop fa-2x"></i></div>
+                        <h6 class="small fw-bold mb-0">Computer Center</h6>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card h-100 border text-center p-3 hover-shadow" role="button" onclick="runZoneScan('Admin Block', '10.22.0.1-10.22.0.255')">
+                        <div class="mb-2 text-info"><i class="fas fa-building fa-2x"></i></div>
+                        <h6 class="small fw-bold mb-0">Admin Block</h6>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card h-100 border text-center p-3 hover-shadow" role="button" onclick="runZoneScan('Dept. Networks', '10.23.0.1-10.23.0.255')">
+                        <div class="mb-2 text-warning"><i class="fas fa-university fa-2x"></i></div>
+                        <h6 class="small fw-bold mb-0">Departments</h6>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card h-100 border text-center p-3 hover-shadow" role="button" onclick="runZoneScan('Hostel WiFi', '10.24.0.1-10.24.0.255')">
+                        <div class="mb-2 text-info"><i class="fas fa-wifi fa-2x"></i></div>
+                        <h6 class="small fw-bold mb-0">Hostels</h6>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card h-100 border text-center p-3 hover-shadow" role="button" onclick="runZoneScan('Research Park', '10.25.0.1-10.25.0.255')">
+                        <div class="mb-2 text-success"><i class="fas fa-flask fa-2x"></i></div>
+                        <h6 class="small fw-bold mb-0">Research Park</h6>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monitoring Console -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-dark" id="nm_scan_title"><i class="fas fa-radar me-2"></i>Active Monitor</h6>
+                    <div class="d-flex gap-2">
+                        <div class="input-group input-group-sm w-auto">
+                            <input type="text" class="form-control" id="nm_range" value="10.21.200.1-10.21.203.255" placeholder="Range">
+                            <button class="btn btn-dark" onclick="runNetworkMonitor()">Run Scan</button>
+                        </div>
+                        <button id="nm_download_btn" class="btn btn-sm btn-success d-none"><i class="fas fa-download"></i></button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 500px;">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="bg-light sticky-top">
+                                <tr>
+                                    <th class="ps-3">Asset / IP</th>
+                                    <th>Device Profile</th>
+                                    <th>Status</th>
+                                    <th>Threat Intelligence</th>
+                                    <th>Security Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="nm_table_body">
+                                <tr><td colspan="5" class="text-center py-5 text-muted">Select a zone above to begin monitoring.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VAPT -->
+        <div id="vapt" class="section d-none">
+            <h4 class="mb-3 text-dark">VAPT Report Generator</h4>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="input-group mb-4">
+                        <input type="text" class="form-control" id="vapt_target" placeholder="Target Domain or IP">
+                        <button class="btn btn-primary" onclick="runVAPT()">Generate Professional Report</button>
+                    </div>
+                    
+                    <div id="vapt_ui" style="display:none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                             <span id="vapt_status" class="text-primary fw-bold">Initializing...</span>
+                             <button id="vapt_download_btn" class="btn btn-success btn-sm disabled"><i class="fas fa-download me-2"></i> Download Professional Report (PDF)</button>
+                        </div>
+                        <div id="vapt_results_container" style="min-height: 400px; max-height: 70vh; overflow-y: auto; background-color: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compliance -->
+        <div id="compliance" class="section d-none">
+            <h4 class="mb-3 text-dark">Compliance & Standards</h4>
+            
+            <!-- Control Panel -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row align-items-end g-3">
+                        <div class="col-md-9">
+                            <label class="form-label small text-muted">Target Host / Infrastructure</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="fas fa-server text-primary"></i></span>
+                                <input type="text" class="form-control form-control-lg" id="comp_target" placeholder="Enter IP Address (e.g. 10.21.200.50)">
+                                <button class="btn btn-primary px-4 fw-bold" onclick="runCompliance()">Run IITM Audit</button>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-end">
+                             <div id="comp_status" class="text-muted small mb-2 fw-bold">System Ready</div>
+                             <button id="comp_download_btn" class="btn btn-sm btn-success w-100 d-none"><i class="fas fa-download me-2"></i> Download Report</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-time Score Dashboard -->
+            <div id="comp_dashboard_area" class="mb-4"></div>
+
+            <!-- Full Page Results Grid -->
+            <div id="comp_results_container" class="pb-5">
+                 <!-- Dynamic Cards will appear here -->
+                 <div class="text-center py-5 text-muted">
+                     <i class="fas fa-clipboard-check fa-4x mb-3 text-light-gray"></i>
+                     <h5>Awaiting Audit Initiation</h5>
+                     <p class="small">Enter a target above to begin the IIT Madras Compliance Verification process.</p>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Virus Scanner -->
+        <div id="virusScanner" class="section d-none">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4 class="mb-1 text-dark fw-bold">Malware & Advanced Threat Analysis</h4>
+                    <p class="text-muted small mb-0">Signature-based detection & Heuristic Behavioral Analysis</p>
+                </div>
+                <div>
+                    <button id="vs_download_btn" class="btn btn-outline-success d-none" onclick=""><i class="fas fa-file-pdf me-2"></i>Export Report</button>
+                </div>
+            </div>
+
+            <!-- Scanner Control -->
+            <div class="card shadow-sm mb-4 border-0">
+                <div class="card-body p-4">
+                    <div class="row align-items-center g-3">
+                        <div class="col-md-9">
+                            <label class="form-label small text-uppercase text-muted fw-bold ls-1">Target Endpoint / URL</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0"><i class="fas fa-crosshairs text-danger"></i></span>
+                                <input type="text" class="form-control border-start-0 ps-0" id="vs_target" placeholder="e.g. 192.168.1.5 or suspicious-site.com">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label d-block text-white">.</label>
+                            <button class="btn btn-danger w-100 fw-bold" onclick="runVirusScan()">
+                                <i class="fas fa-biohazard me-2"></i>INITIATE SCAN
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Status Board -->
+            <div id="vs_status_board" class="d-none mb-4">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card bg-white border-start border-4 border-primary shadow-sm h-100">
+                            <div class="card-body py-3">
+                                <h6 class="text-uppercase text-muted small fw-bold mb-1">Scan Status</h6>
+                                <div class="d-flex align-items-center">
+                                    <div class="spinner-border text-primary spinner-border-sm me-2" id="vs_spinner"></div>
+                                    <h5 class="mb-0 text-primary fw-bold" id="vs_status_text">Initializing...</h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-white border-start border-4 border-danger shadow-sm h-100">
+                            <div class="card-body py-3">
+                                <h6 class="text-uppercase text-muted small fw-bold mb-1">Threats Detected</h6>
+                                <h5 class="mb-0 text-danger fw-bold" id="vs_threat_count">0</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-white border-start border-4 border-success shadow-sm h-100">
+                            <div class="card-body py-3">
+                                <h6 class="text-uppercase text-muted small fw-bold mb-1">Signatures Checked</h6>
+                                <h5 class="mb-0 text-dark fw-bold" id="vs_sig_count">0</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Container -->
+            <div id="vs_results_container" class="mt-3">
+                <!-- Content injected by JS -->
+                <div class="text-center py-5">
+                    <div class="bg-light rounded-circle d-inline-flex p-4 mb-3">
+                        <i class="fas fa-shield-virus fa-3x text-secondary"></i>
+                    </div>
+                    <h5 class="text-muted">Ready to Analyze</h5>
+                    <p class="small text-muted">Enter a target to begin deep inspection against IITM Threat Database.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CVE Scanner -->
+        <div id="cveScanner" class="section d-none">
+            <h4 class="mb-3 text-dark">CVE Vulnerability Finder</h4>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="input-group mb-4">
+                        <input type="text" class="form-control" id="cve_target" placeholder="Target IP">
+                        <button class="btn btn-primary" onclick="runCVEScan()">Scan for CVEs</button>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="alert alert-light border small mb-0 w-100 me-3" id="cve_status">Ready</div>
+                        <button id="cve_download_btn" class="btn btn-sm btn-success d-none"><i class="fas fa-download"></i> Report</button>
+                    </div>
+                    <div id="cve_results_container" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TLS Checker -->
+        <div id="tlsChecker" class="section d-none">
+            <h4 class="mb-3 text-dark">TLS/SSL Inspector</h4>
+             <div class="card shadow-sm">
+                <div class="card-body">
+                     <div class="input-group mb-4">
+                        <input type="text" class="form-control" id="tls_host" placeholder="domain.iitm.ac.in">
+                        <button class="btn btn-info text-white" onclick="runTLSCheck()">Inspect</button>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3 px-2">
+                        <h5 id="tls_status_header" class="text-muted mb-0">Ready to Scan</h5>
+                        <button id="tls_download_btn" class="btn btn-sm btn-success d-none"><i class="fas fa-download"></i> Report</button>
+                    </div>
+                    
+                    <div class="table-responsive rounded border">
+                        <table class="table table-hover mb-0 bg-white">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Security Check</th>
+                                    <th>Result</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tls_table_body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Scanner -->
+        <div id="bulkScanner" class="section d-none">
+            <h4 class="mb-3 text-dark">Bulk Scanner</h4>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex gap-3 align-items-center mb-3">
+                        <input type="file" class="form-control" id="bulk_file" accept=".csv">
+                        <button class="btn btn-primary" onclick="runBulkScan()">Scan CSV</button>
+                        <button id="bulk_download_btn" class="btn btn-success d-none"><i class="fas fa-download"></i> Report</button>
+                    </div>
+                    <p class="small text-muted">CSV Format: <code>IP, Ports</code> (e.g., 10.0.0.1, 80-443)</p>
+                    <div class="table-responsive border rounded" style="max-height: 400px;">
+                        <table class="table table-bordered table-striped mb-0">
+                            <thead class="table-light"><tr><th>IP</th><th>Ports Input</th><th>Open Ports</th><th>Status</th></tr></thead>
+                            <tbody id="bulk_table_body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Admin Panel -->
+        <div id="adminPanel" class="section d-none">
+            <h4 class="mb-3 text-dark">Admin Panel</h4>
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <ul class="nav nav-tabs card-header-tabs">
+                        <li class="nav-item"><button class="nav-link active text-dark" data-bs-toggle="tab" data-bs-target="#tab-reqs">Requests</button></li>
+                        <li class="nav-item"><button class="nav-link text-dark" data-bs-toggle="tab" data-bs-target="#tab-logs" onclick="loadAdminLogs()">Project Logs</button></li>
+                        <li class="nav-item"><button class="nav-link text-dark" data-bs-toggle="tab" data-bs-target="#tab-aprofile" onclick="loadProfile()">My Profile</button></li>
+                    </ul>
+                </div>
+
+                <div class="card-body">
+                    <div class="tab-content">
+                        <!-- Requests -->
+                        <div class="tab-pane fade show active" id="tab-reqs">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover mb-0">
+                                    <thead class="table-light"><tr><th>ID</th><th>User</th><th>Type</th><th>Target</th><th>Description</th><th>Priority</th><th>Action/Status</th></tr></thead>
+                                    <tbody id="admin_requests_body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Logs -->
+                        <div class="tab-pane fade" id="tab-logs">
+                            <!-- View 1: List -->
+                            <div id="logs_list_view" class="h-100">
+                                <div class="card border shadow-sm" style="min-height: 70vh;">
+                                    <div class="card-header bg-white py-3">
+                                        <div class="row g-3 align-items-center">
+                                            <div class="col-md-4">
+                                                <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-history me-2 text-primary"></i>Project Logs</h5>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <div class="d-flex gap-2 justify-content-end">
+                                                    <input type="text" id="log_search" class="form-control" placeholder="Search logs...">
+                                                    <input type="date" id="log_date_filter" class="form-control" style="max-width: 150px;">
+                                                    <select id="log_filter" class="form-select" style="max-width: 150px;">
+                                                        <option value="all">All Types</option>
+                                                        <option value="VirusScan">Virus Scan</option>
+                                                        <option value="NetworkMonitor">Network Monitor</option>
+                                                        <option value="Compliance">Compliance</option>
+                                                        <option value="VAPT">VAPT</option>
+                                                        <option value="TLSCheck">TLS Check</option>
+                                                        <option value="PortScan">Port Scan</option>
+                                                        <option value="BulkScan">Bulk Scan</option>
+                                                        <option value="CVE">CVE Scan</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive h-100">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead class="table-light sticky-top">
+                                                    <tr>
+                                                        <th class="ps-4">Log File</th>
+                                                        <th>Type</th>
+                                                        <th>Date Generated</th>
+                                                        <th>Size</th>
+                                                        <th class="text-end pe-4">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="log_files_table_body">
+                                                    <!-- Rows -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                     <div class="card-footer bg-light text-muted small">
+                                        Showing <span id="log_count" class="fw-bold">0</span> logs
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- View 2: Detail -->
+                            <div id="logs_detail_view" class="h-100 d-none">
+                                <div class="card border shadow-sm" style="min-height: 70vh;">
+                                     <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="showLogList()"><i class="fas fa-arrow-left me-1"></i> Back</button>
+                                            <h6 class="mb-0 fw-bold text-dark" id="log_preview_title">Log Details</h6>
+                                        </div>
+                                        <button class="btn btn-sm btn-primary" id="dl_log_btn"><i class="fas fa-download me-2"></i>Download</button>
+                                    </div>
+                                    <div class="card-body p-0 overflow-auto terminal-window" style="background: #ffffff; color: #212529; border-radius: 0 0 4px 4px; height: 65vh;">
+                                         <table class="table table-borderless table-sm font-monospace text-dark mb-0" style="font-size: 0.85rem;">
+                                             <tbody id="log_content_table_body"></tbody>
+                                         </table>
+                                    </div>
+                                 </div>
+                            </div>
+                        </div>
+
+                        
+                        <!-- Profile -->
+                        <div class="tab-pane fade" id="tab-aprofile">
+                             <div class="row g-4">
+                                <div class="col-md-4">
+                                    <div class="card h-100 text-center p-4 bg-light border">
+                                        <div class="mx-auto mb-3" style="width: 120px; height: 120px; overflow: hidden; border-radius: 50%; border: 4px solid #fff;">
+                                            <img id="ap_photo" src="/static/img/default_user.png" alt="Profile Photo" class="w-100 h-100" style="object-fit: cover;">
+                                        </div>
+                                        <h5 id="ap_name" class="fw-bold mb-1"></h5>
+                                        <span id="ap_role" class="badge bg-danger align-self-center"></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="card h-100 border">
+                                        <div class="card-body">
+                                            <ul class="list-group list-group-flush">
+                                                <li class="list-group-item py-3"><span class="text-muted d-block small">Name</span> <span id="ap_full_name" class="fw-bold"></span></li>
+                                                <li class="list-group-item py-3"><span class="text-muted d-block small">Designation</span> <span id="ap_full_desig" class="fw-bold"></span></li>
+                                                <li class="list-group-item py-3"><span class="text-muted d-block small">Email</span> <span id="ap_email" class="fw-bold"></span></li>
+                                                <li class="list-group-item py-3"><span class="text-muted d-block small">Department</span> <span id="ap_dept" class="fw-bold"></span></li>
+                                                <li class="list-group-item py-3"><span class="text-muted d-block small">Employee ID</span> <span id="ap_empid" class="fw-bold"></span></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- New Request Modal -->
+<div class="modal fade" id="requestModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">New Security Request</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="requestForm">
+                    <input type="hidden" id="req_username">
+                    <div class="mb-3">
+                        <label class="form-label">Scan Type</label>
+                        <select class="form-select" id="req_type">
+                            <option>Compliance Request</option>
+                            <option>VAPT</option>
+                            <option>Port Scan</option>
+                            <option>CVE Scanner</option>
+                            <option>Virus Scanner</option>
+                            <option>TLS Checker</option>
+                            <option>Network Monitor</option>
+                            <option>IP Range Scanner</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Target (IP/Domain)</label>
+                        <input type="text" class="form-control" id="req_target" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="req_desc" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <select class="form-select" id="req_priority">
+                            <option>Low</option>
+                            <option>Medium</option>
+                            <option>High</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Attachment (Optional)</label>
+                        <input type="file" class="form-control" id="req_file">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitRequest()">Submit Request</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User LDAP Modal -->
+<div class="modal fade" id="ldapModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-white text-dark">
+             <div class="modal-header border-bottom">
+                <h5 class="modal-title fw-bold text-dark">User Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="ldap_modal_body">
+                <div class="text-center"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

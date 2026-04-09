@@ -1,0 +1,317 @@
+:root {
+    /* Professional Light Theme Palette */
+    --bg-primary: #f0f2f5; /* Light Grey Background */
+    --bg-secondary: #ffffff; /* White Cards/Sidebar */
+    --bg-tertiary: #f8f9fa; /* Hover states */
+    
+    --text-primary: #2d3748; /* Dark Grey for Headings */
+    --text-secondary: #4a5568; /* Medium Grey for text */
+    --text-muted: #718096; /* Light Grey for small text */
+    
+    /* Brand Colors - Professional Blue Theme */
+    --brand-primary: #0f172a; /* Slate 900 (Dark) */
+    --brand-secondary: #1e293b; /* Slate 800 (Sidebar) */
+    --brand-accent: #3b82f6; /* Blue 500 (Highlights) */
+    
+    /* Status Colors (Professional) */
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    --info-color: #3b82f6;
+    
+    --success-bg: #d1fae5;
+    --warning-bg: #fef3c7;
+    --danger-bg: #fee2e2;
+    --info-bg: #dbeafe;
+
+    --border-color: #e2e8f0;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    
+    /* Layout */
+    --sidebar-width: 260px;
+    --header-height: 70px;
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: transparent; 
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e0; 
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0; 
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--brand-secondary);
+}
+
+/* Cards */
+.card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.card-header {
+    background-color: transparent;
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    color: var(--brand-secondary);
+}
+
+/* Sidebar Styling */
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--brand-secondary); /* Dark Slate Blue */
+    color: white;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.1);
+}
+
+.sidebar-header {
+    height: auto;
+    padding: 1.5rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.1);
+    color: white;
+}
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.7);
+    padding: 0.85rem 1.5rem;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+    border-left: 4px solid transparent;
+    font-weight: 500;
+    font-size: 0.95rem;
+    text-decoration: none;
+}
+
+.nav-link i {
+    width: 24px;
+    margin-right: 10px;
+    text-align: center;
+    font-size: 1.1em;
+}
+
+.nav-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.nav-link.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border-left-color: var(--brand-accent); /* Blue Accent */
+}
+
+/* Main Content Area */
+.main-content {
+    margin-left: var(--sidebar-width);
+    padding: 2rem;
+    min-height: 100vh;
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: var(--brand-accent);
+    border-color: var(--brand-accent);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    font-weight: 500;
+}
+.btn-primary:hover, .btn-primary:focus {
+    background-color: #2563eb;
+    border-color: #2563eb;
+}
+
+.btn-outline-light {
+    /* Override for sidebar toggle on mobile which is typically on dark bg */
+    border-color: rgba(255,255,255,0.5);
+    color: white;
+}
+
+/* Tables */
+.table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--text-primary);
+    --bs-table-border-color: var(--border-color);
+}
+.table thead th {
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--border-color);
+}
+.table-hover tbody tr:hover {
+    background-color: #f1f5f9;
+}
+
+/* In Dark Theme (Terminal) override tables */
+.table-dark {
+    --bs-table-bg: #1e293b;
+    --bs-table-color: #e2e8f0;
+    --bs-table-border-color: #334155;
+}
+.table-dark thead th {
+    background-color: #0f172a;
+    color: #94a3b8;
+}
+
+/* Form Elements */
+.form-control, .form-select {
+    background-color: #fff !important;
+    border: 1px solid #e2e8f0;
+    color: var(--text-primary) !important;
+    border-radius: 0.5rem;
+    padding: 0.6rem 1rem;
+    font-size: 0.95rem; /* Slightly smaller font for sleek look */
+    transition: all 0.2s ease-in-out;
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--brand-accent);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+/* Enhanced UI Utilities */
+.bg-gradient-brand {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%) !important;
+}
+
+.smooth-shadow {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+}
+
+.rounded-xl {
+    border-radius: 1rem !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+}
+
+/* Floating Label Tweaks */
+.form-floating > .form-control {
+    height: calc(3.5rem + 2px);
+    line-height: 1.25;
+    /* Ensure padding accommodates the label */
+    padding-top: 1.625rem;
+    padding-bottom: 0.625rem;
+}
+.form-floating > label {
+    padding: 1rem 1rem;
+    /* Adjust label position if needed */
+}
+
+/* Terminal / Log Output (Keep Dark for Readability) */
+.terminal-window {
+    background-color: #1e293b; /* Slate 800 */
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    height: 400px;
+    overflow-y: auto;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+}
+.terminal-window::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
+/* Status Badges */
+.badge {
+    padding: 0.5em 0.8em;
+    font-weight: 600;
+    border-radius: 6px;
+    color: #fff; /* Ensure text is visible on dark badges */
+}
+
+/* Fix visibility for text-muted on white */
+.text-muted {
+    color: #64748b !important; /* Slightly darker grey for better contrast */
+}
+
+/* Ensure light text on dark backgrounds */
+.bg-dark .text-muted, .sidebar .text-muted {
+    color: #94a3b8 !important;
+}
+
+/* Utility Classes */
+.text-brand { color: var(--brand-accent) !important; }
+.text-dark-blue { color: var(--brand-secondary) !important; }
+
+/* Dashboard Specifics */
+.border-left-danger { border-left: 4px solid var(--danger-color); }
+.border-left-warning { border-left: 4px solid var(--warning-color); }
+.border-left-success { border-left: 4px solid var(--success-color); }
+.border-left-info { border-left: 4px solid var(--info-color); }
+
+/* Loading Overlay */
+#loadingOverlay {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(4px);
+    color: var(--brand-secondary);
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .sidebar { margin-left: calc(var(--sidebar-width) * -1); transition: margin-left 0.3s ease; }
+    .sidebar.show { margin-left: 0; }
+    .main-content { margin-left: 0; }
+}
+
+/* Log Colors for Terminal */
+.log-error { color: #f87171; }
+.log-success { color: #4ade80; }
+.log-info { color: #60a5fa; }
+.log-warn { color: #facc15; }
+
+/* Custom Animations */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translate3d(0, 20px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.5s ease-out both;
+}
