@@ -163,20 +163,19 @@
 
             <!-- Main Layout Grid -->
             <div class="row g-4 mb-4">
-                <!-- Left Column: Traffic & Threats -->
+                <!-- Left Column: Analytics & Operations -->
                 <div class="col-lg-8">
-                    <!-- Traffic Chart -->
+                    <!-- Vulnerability Distribution Chart -->
                     <div class="card border-0 shadow-sm mb-4">
                         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
-                            <h6 class="mb-0 text-dark fw-bold"><i class="fas fa-chart-area me-2 text-primary"></i>Network Traffic Anomaly Detection</h6>
+                            <h6 class="mb-0 text-dark fw-bold"><i class="fas fa-chart-pie me-2 text-primary"></i>Global Threat & Vulnerability Distribution</h6>
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-light text-dark active">Live</button>
-                                <button class="btn btn-outline-light text-muted">1H</button>
-                                <button class="btn btn-outline-light text-muted">24H</button>
+                                <button class="btn btn-outline-secondary active">Live</button>
+                                <button class="btn btn-outline-secondary text-muted">Last Scan</button>
                             </div>
                         </div>
-                        <div class="card-body pt-0">
-                            <canvas id="trafficChart" height="250"></canvas>
+                        <div class="card-body pt-0 d-flex justify-content-center align-items-center" style="height: 250px;">
+                            <canvas id="vulnChart"></canvas>
                         </div>
                     </div>
 

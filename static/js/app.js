@@ -1624,73 +1624,69 @@ function updateDashboardStats() {
 }
 
 // --- Dashboard Visuals & Real-time Data ---
-let trafficChart = null;
+let vulnChart = null;
 let dashboardInterval = null;
 
 function initDashboard() {
     if (dashboardInterval) clearInterval(dashboardInterval);
     
     // Init Chart.js
-    const ctx = document.getElementById('trafficChart')?.getContext('2d');
-    if (ctx && !trafficChart) {
-        trafficChart = new Chart(ctx, {
-            type: 'line',
+    const ctx = document.getElementById('vulnChart')?.getContext('2d');
+    if (ctx && !vulnChart) {
+        vulnChart = new Chart(ctx, {
+            type: 'doughnut',
             data: {
-                labels: Array(20).fill(''),
+                labels: ['Critical', 'High', 'Medium', 'Low'],
                 datasets: [{
-                    label: 'Inbound (Mbps)',
-                    data: Array(20).fill(0),
-                    borderColor: '#6366f1',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    data: [0, 0, 0, 0],
+                    backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#20c997'],
                     borderWidth: 2,
-                    fill: true,
-                    tension: 0.4
-                }, {
-                    label: 'Outbound (Mbps)',
-                    data: Array(20).fill(0),
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4
+                    borderColor: '#ffffff'
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { labels: { color: '#94a3b8' } } },
-                scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.05)' } },
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { color: '#495057', padding: 20, font: { weight: 'bold', family: "'Inter', sans-serif" } }
+                    }
                 },
-                animation: false
+                animation: { animateScale: true }
             }
         });
     }
 
+    // Initial Fetch
+    updateVulnChart();
+    fetchRealAlerts();
+    updateDashboardStats();
+
     // Start Real-time Loop
     dashboardInterval = setInterval(() => {
-        updateTrafficChart();
+        updateVulnChart();
         fetchRealAlerts();
         updateDashboardStats();
-    }, 2000);
+    }, 5000);
 }
 
-function updateTrafficChart() {
-    if (!trafficChart) return;
-    
-    secureFetch('/dashboard/traffic').then(r => r.json()).then(data => {
-        const d1 = trafficChart.data.datasets[0].data;
-        const d2 = trafficChart.data.datasets[1].data;
-        
-        d1.shift();
-        d2.shift();
-        
-        d1.push(data.inbound_mbps);
-        d2.push(data.outbound_mbps);
-        
-        trafficChart.update();
-    }).catch(e => console.error("Traffic Error", e));
+function updateVulnChart() {
+    if (!vulnChart) return;
+
+    // Fetch aggregated real-time vulnerability statistics from DB
+    secureFetch('/dashboard/vuln-stats').then(r => r.json()).then(data => {
+        if(data && data.stats) {
+            vulnChart.data.datasets[0].data = [
+                data.stats.Critical || 0,
+                data.stats.High || 0,
+                data.stats.Medium || 0,
+                data.stats.Low || 0
+            ];
+            vulnChart.update();
+        }
+    }).catch(e => console.error("Vuln Stats Error", e));
 }
 
 let lastAlertTime = "";
@@ -1699,42 +1695,34 @@ function fetchRealAlerts() {
     secureFetch('/dashboard/alerts').then(r => r.json()).then(data => {
         if (!data.alerts || data.alerts.length === 0) return;
         
-        // Only add new alerts (simple check against top timestamp)
-        const latest = data.alerts[0];
-        if (latest.timestamp !== lastAlertTime) {
-            // Clear feed if it's the first load to remove "Waiting..."
-            const feed = document.getElementById('liveAlertsFeed');
-            if (feed.innerText.includes("Waiting")) feed.innerHTML = "";
+        const feed = document.getElementById('liveAlertsFeed');
+        if (feed.innerText.includes("System initialized")) feed.innerHTML = "";
+
+        // Render up to 10 latest alerts from real DB
+        feed.innerHTML = "";
+        data.alerts.forEach(alert => {
+            const color = alert.severity === 'Critical' ? 'danger' : (alert.severity === 'High' ? 'warning text-dark' : 'info text-dark');
+            const item = document.createElement('div');
+            item.className = 'list-group-item bg-transparent border-bottom border-light text-dark py-2';
             
-            // Add alert to list
-            addAlert(latest.message, latest.severity, latest.source);
-            lastAlertTime = latest.timestamp;
-        }
+            let timeStr = "Just now";
+            try {
+                timeStr = new Date(alert.timestamp).toLocaleTimeString();
+            } catch(e) {}
+
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge bg-${color} me-2">${alert.severity}</span>
+                        <small class="text-muted">${timeStr}</small>
+                    </div>
+                    <small class="text-primary fw-bold" style="font-size: 0.8rem;">${alert.source}</small>
+                </div>
+                <div class="mt-2 fw-medium">${alert.message}</div>
+            `;
+            feed.appendChild(item);
+        });
+
     }).catch(e => console.error("Alerts Error", e));
 }
 
-function addAlert(msg, severity, source) {
-    const feed = document.getElementById('liveAlertsFeed');
-    if (!feed) return;
-    
-    const color = severity === 'High' ? 'danger' : 'warning';
-    const item = document.createElement('div');
-    item.className = 'list-group-item bg-transparent border-bottom border-light text-dark py-2 page-transition';
-    item.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <span class="badge bg-${color} me-2">${severity}</span>
-                <small class="text-muted">${new Date().toLocaleTimeString()}</small>
-            </div>
-            <small class="text-primary fw-bold" style="font-size: 0.8rem;">${source}</small>
-        </div>
-        <div class="mt-2 fw-medium">${msg}</div>
-    `;
-    
-    feed.insertBefore(item, feed.firstChild);
-    
-    // Keep list short
-    if (feed.children.length > 10) {
-        feed.removeChild(feed.lastChild);
-    }
-}
