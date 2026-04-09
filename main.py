@@ -2106,10 +2106,11 @@ class ProfessionalPDF(FPDF):
         self.set_fill_color(220, 220, 220)
         
         # Table Header
-        self.cell(30, 8, "CVE ID", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
-        self.cell(20, 8, "CVSS", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
-        self.cell(30, 8, "Severity", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
-        self.cell(110, 8, "Description", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
+        self.cell(25, 8, "CVE ID", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
+        self.cell(15, 8, "CVSS", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
+        self.cell(25, 8, "Severity", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
+        self.cell(40, 8, "Affected Service", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
+        self.cell(85, 8, "Vulnerability Description", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
         
         self.set_font(self.main_font, '', 9)
         
@@ -2119,65 +2120,91 @@ class ProfessionalPDF(FPDF):
                 cvss = str(f.get('cvss', '-'))
                 sev = f.get('severity', '-')
                 desc = f.get('description', '-')
+                # Try to extract service from message "Port 80: CVE..." or "Product: Apache..."
+                svc = "-"
+                details = f.get('details', '')
+                msg = f.get('message', '')
+                if "Product:" in details:
+                    svc = details.split("Product:")[1].split("(")[0].strip()
+                elif "Port " in msg:
+                    svc = msg.split(":")[0].strip()
                 
                 # Check height
-                nb = max(self.get_string_width(desc) / 105, 1)
+                nb = max(self.get_string_width(desc) / 80, 1)
                 h = 6 * (int(nb) + 1)
                 
                 if self.get_y() + h > 270:
                     self.add_page()
                     # Re-print header
                     self.set_font(self.main_font, 'B', 10)
-                    self.cell(30, 8, "CVE ID", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
-                    self.cell(20, 8, "CVSS", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
-                    self.cell(30, 8, "Severity", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
-                    self.cell(110, 8, "Description", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
+                    self.cell(25, 8, "CVE ID", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
+                    self.cell(15, 8, "CVSS", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
+                    self.cell(25, 8, "Severity", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
+                    self.cell(40, 8, "Affected Service", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
+                    self.cell(85, 8, "Vulnerability Description", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
                     self.set_font(self.main_font, '', 9)
 
                 x = self.get_x()
                 y = self.get_y()
                 
-                self.rect(x, y, 30, h)
-                self.multi_cell(30, h, cve, align='C', new_x="RIGHT", new_y="TOP")
+                self.rect(x, y, 25, h)
+                self.multi_cell(25, h, cve, align='C', new_x="RIGHT", new_y="TOP")
                 
-                self.set_xy(x + 30, y)
-                self.rect(x + 30, y, 20, h)
-                self.multi_cell(20, h, cvss, align='C', new_x="RIGHT", new_y="TOP")
+                self.set_xy(x + 25, y)
+                self.rect(x + 25, y, 15, h)
+                self.multi_cell(15, h, cvss, align='C', new_x="RIGHT", new_y="TOP")
                 
-                self.set_xy(x + 50, y)
-                self.rect(x + 50, y, 30, h)
+                self.set_xy(x + 40, y)
+                self.rect(x + 40, y, 25, h)
                 
                 # Colorize Severity Text
                 if sev == 'Critical': self.set_text_color(200, 0, 0)
                 elif sev == 'High': self.set_text_color(200, 100, 0)
+                elif sev == 'Medium': self.set_text_color(204, 153, 0)
                 else: self.set_text_color(0, 0, 0)
-                self.multi_cell(30, h, sev, align='C', new_x="RIGHT", new_y="TOP")
+                self.multi_cell(25, h, sev, align='C', new_x="RIGHT", new_y="TOP")
                 self.set_text_color(0, 0, 0)
+
+                self.set_xy(x + 65, y)
+                self.rect(x + 65, y, 40, h)
+                self.multi_cell(40, 6, svc, align='C', new_x="RIGHT", new_y="TOP")
                 
-                self.set_xy(x + 80, y)
-                self.rect(x + 80, y, 110, h)
-                self.multi_cell(110, 6, desc, align='L', new_x="LMARGIN", new_y="NEXT")
+                self.set_xy(x + 105, y)
+                self.rect(x + 105, y, 85, h)
+                self.multi_cell(85, 6, desc, align='L', new_x="LMARGIN", new_y="NEXT")
                 
                 self.set_y(y + h)
     
     def add_compliance_score_card(self, findings):
-        # Extract score
+        # Extract score and categories
         score = 0
+        cat_stats = {}
         for f in findings:
             if "Final Compliance Score" in f.get('message', ''):
                 try:
                      score = int(f['message'].split(':')[1].split('/')[0].strip())
                 except: pass
+
+            c = f.get('category')
+            if c and c != 'Summary':
+                if c not in cat_stats:
+                    cat_stats[c] = {'pass': 0, 'fail': 0}
+                if f.get('severity') in ['Critical', 'High', 'Medium']:
+                    cat_stats[c]['fail'] += 1
+                else:
+                    cat_stats[c]['pass'] += 1
         
         self.ln(5)
-        self.set_font(self.main_font, 'B', 14)
-        self.cell(0, 10, "Compliance Scorecard", 0, 1)
+        self.set_font(self.main_font, 'B', 16)
+        self.set_text_color(0, 51, 102)
+        self.cell(0, 10, "Executive Compliance Scorecard", 0, 1)
+        self.set_text_color(0, 0, 0)
         
         # Draw Dashboard Box
         start_y = self.get_y()
         self.set_fill_color(248, 250, 252) # Very light grey
         self.set_draw_color(226, 232, 240) # Slate 200
-        self.rect(10, start_y, 190, 50, 'DF')
+        self.rect(10, start_y, 190, 45, 'DF')
         
         # Determine Status and Color
         color = (16, 185, 129) # Success Green (#10b981)
@@ -2191,26 +2218,55 @@ class ProfessionalPDF(FPDF):
             
         # Draw Progress Bar Background
         self.set_fill_color(226, 232, 240)
-        self.rect(30, start_y + 35, 150, 4, 'F')
+        self.rect(30, start_y + 35, 150, 6, 'F')
         
         # Draw Progress Bar Foreground
         self.set_fill_color(*color)
         if score > 0:
-            self.rect(30, start_y + 35, 1.5 * score, 4, 'F')
+            self.rect(30, start_y + 35, 1.5 * score, 6, 'F')
             
         # Score Text
-        self.set_y(start_y + 10)
+        self.set_y(start_y + 8)
         self.set_font(self.main_font, 'B', 24)
         self.set_text_color(*color)
         self.cell(190, 10, f"{score}/100", 0, 1, 'C')
         
-        self.set_y(start_y + 22)
+        self.set_y(start_y + 20)
         self.set_font(self.main_font, 'B', 12)
         self.set_text_color(100, 116, 139) # Slate 500
-        self.cell(190, 8, status, 0, 1, 'C')
+        self.cell(190, 8, f"OVERALL STATUS: {status}", 0, 1, 'C')
         
         self.set_text_color(0, 0, 0)
         self.set_y(start_y + 55)
+
+        if cat_stats:
+            self.set_font(self.main_font, 'B', 12)
+            self.cell(0, 10, "Control Domain Breakdown", 0, 1)
+
+            # Table Header
+            self.set_fill_color(230, 230, 230)
+            self.set_font(self.main_font, 'B', 10)
+            self.cell(80, 8, "Security Domain", border=1, new_x="RIGHT", new_y="TOP", align='L', fill=True)
+            self.cell(30, 8, "Passed", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
+            self.cell(30, 8, "Failed", border=1, new_x="RIGHT", new_y="TOP", align='C', fill=True)
+            self.cell(50, 8, "Domain Health", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
+
+            self.set_font(self.main_font, '', 10)
+            for cat, counts in cat_stats.items():
+                total = counts['pass'] + counts['fail']
+                health = "100%" if total == 0 else f"{int((counts['pass']/total)*100)}%"
+
+                self.cell(80, 8, cat, border=1, new_x="RIGHT", new_y="TOP", align='L')
+
+                self.set_text_color(16, 185, 129) if counts['pass'] > 0 else self.set_text_color(0,0,0)
+                self.cell(30, 8, str(counts['pass']), border=1, new_x="RIGHT", new_y="TOP", align='C')
+
+                self.set_text_color(239, 68, 68) if counts['fail'] > 0 else self.set_text_color(0,0,0)
+                self.cell(30, 8, str(counts['fail']), border=1, new_x="RIGHT", new_y="TOP", align='C')
+
+                self.set_text_color(0,0,0)
+                self.cell(50, 8, health, border=1, new_x="LMARGIN", new_y="NEXT", align='C')
+            self.ln(5)
 
     def draw_risk_chart(self, counts):
         # Improved Horizontal Bar Chart for Risks
@@ -2297,21 +2353,21 @@ class ProfessionalPDF(FPDF):
         
         recs = []
         if "risky_service" in issues:
-            recs.append("Critical: Restrict access to high-risk services (SMB, RDP, Telnet). Ensure they are not exposed to the public internet.")
+            recs.append("Critical: Immediately restrict access to highly exploitable services (e.g. SMB, RDP, Telnet) via network firewalls and VPNs. Do not expose administrative interfaces to the public Internet.")
         if "web_vuln" in issues:
-            recs.append("High: Remediate web application vulnerabilities (XSS, SQLi). Implement strict input validation and WAF rules.")
+            recs.append("High: Remediate web application vulnerabilities (such as XSS, SQLi) by sanitizing inputs, using parameterized queries, and deploying a Web Application Firewall (WAF).")
         if "outdated_soft" in issues:
-            recs.append("High: Update server software (Apache, PHP, Nginx) to the latest stable versions to mitigate known CVEs.")
+            recs.append("High: Establish a robust patch management lifecycle. Update identified legacy software components to their latest stable releases to mitigate documented CVEs.")
         if "tls" in issues:
-            recs.append("Medium: Enforce strong cryptography. Disable TLS 1.0/1.1 and weak cipher suites. Ensure certificates are valid.")
+            recs.append("Medium: Enforce strict cryptographic controls. Disable deprecated protocols (TLS 1.0/1.1, SSLv3) and ensure the implementation of strong cipher suites. Renew any expiring certificates.")
         if "headers" in issues:
-            recs.append("Medium: Implement security headers (HSTS, CSP, X-Frame-Options) to protect against client-side attacks.")
+            recs.append("Medium: Harden client-side security by implementing industry-standard HTTP security headers, including HSTS, Content-Security-Policy (CSP), and X-Frame-Options.")
         if "ports" in issues:
-            recs.append("Low: Review firewall rules. Close any ports that are not required for business operations.")
+            recs.append("Low: Audit the external network perimeter. Implement a default-deny firewall posture and close any ports that do not serve a critical business function.")
             
         if not recs:
             # Fallback
-            recs.append("Review the detailed findings and apply appropriate patches.")
+            recs.append("Carefully review the detailed findings and apply all vendor-supplied patches and recommended configurations.")
             
         for r in recs:
             self.multi_cell(0, 6, f"- {r}")
@@ -2319,9 +2375,9 @@ class ProfessionalPDF(FPDF):
         
         self.ln(5)
         self.set_font(self.main_font, 'B', 11)
-        self.cell(0, 8, "General Best Practices:", 0, 1)
+        self.cell(0, 8, "Strategic Best Practices:", 0, 1)
         self.set_font(self.main_font, '', 10)
-        self.multi_cell(0, 6, "- Regularly update all operating systems and applications.\n- Implement 'Least Privilege' access controls.\n- Conduct quarterly security audits and penetration tests.\n- Monitor logs for suspicious activities.")
+        self.multi_cell(0, 6, "- Implement the Principle of Least Privilege (PoLP) and Zero Trust Architecture (ZTA) across all infrastructure boundaries.\n- Establish continuous security monitoring, centralized logging, and a dedicated Incident Response (IR) plan.\n- Perform routine Vulnerability Assessments and Penetration Testing (VAPT) to identify emerging threats before exploitation.")
 
         self.ln()
 
@@ -2589,11 +2645,11 @@ def generate_professional_pdf_report(target, data_input=None, title="Security As
              other_findings = [f for f in findings if not f.get('cve') or f['cve'] == 'N/A']
              
              if cve_findings:
-                 pdf.chapter_title("Identified Vulnerabilities (CVE)")
+                 pdf.chapter_title("Identified Vulnerabilities (CVE Mapping)")
                  pdf.add_cve_table(cve_findings)
              
              if other_findings:
-                 pdf.chapter_title("Other Findings")
+                 pdf.chapter_title("Supplementary Security Findings")
                  for f in other_findings:
                     sev = f.get('severity', 'Info')
                     tool = f.get('tool', 'General')
@@ -2603,12 +2659,14 @@ def generate_professional_pdf_report(target, data_input=None, title="Security As
         
         elif has_categories:
             # Sort by category to group them
-            # Categories: Standardization, Compliance, Summary
             def cat_sort(x):
                 c = x.get('category', 'General')
                 # Compliance Scan
-                if c == "Standardization": return 1
-                if c == "Compliance": return 2
+                if c == "Asset Management": return 1
+                if c == "Network Security": return 2
+                if c == "Cryptography": return 3
+                if c == "Access Control": return 4
+                if c == "App Security": return 5
                 
                 # VAPT Scan Order
                 if c == "Threat Intelligence": return 10
@@ -2617,14 +2675,23 @@ def generate_professional_pdf_report(target, data_input=None, title="Security As
                 if c == "Web Server Security": return 13
                 if c == "Database Security": return 14
                 if c == "Web Application Security": return 15
-                if c == "Advanced Heuristic Analysis": return 16
                 
-                if c == "Web Security": return 20
+                # Malware/Virus Scan
+                if c == "Network Signature": return 20
+                if c == "Heuristic Analysis": return 21
+                if c == "Signature Matching": return 22
+
                 if c == "Summary": return 99
                 return 50
             
             findings.sort(key=cat_sort)
             
+            # For Virus/Malware reports, add a Threat Hunting Header
+            if "Virus" in title or "Malware" in title:
+                pdf.chapter_title("Threat Intelligence & IoC Analysis")
+                pdf.set_font(pdf.main_font, '', 10)
+                pdf.multi_cell(0, 6, "The following sections detail the exact Indicators of Compromise (IoC) and threat artifacts recovered during the proactive threat hunt.")
+
             current_cat = None
             for f in findings:
                 cat = f.get('category', 'General')
@@ -2633,7 +2700,11 @@ def generate_professional_pdf_report(target, data_input=None, title="Security As
                     pdf.ln(5)
                     pdf.set_font(pdf.main_font, 'B', 12)
                     pdf.set_text_color(0, 51, 102) # Navy Blue
-                    pdf.cell(0, 10, f"-- {cat} --", 0, 1, 'L')
+                    pdf.cell(0, 10, f"Analysis Domain: {cat}", 0, 1, 'L')
+                    pdf.set_draw_color(0, 51, 102)
+                    pdf.set_line_width(0.2)
+                    pdf.line(pdf.get_x(), pdf.get_y(), pdf.get_x() + 190, pdf.get_y())
+                    pdf.ln(3)
                 
                 sev = f.get('severity', 'Info')
                 tool = f.get('tool', 'General')
