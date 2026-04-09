@@ -1626,7 +1626,25 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
             if os.path.exists(venv_bin): return venv_bin
             return shutil.which(name)
 
-        # 1. Nmap (Network & Vuln)
+        # 1. CVE Analysis
+        yield json.dumps({"type": "section", "title": "Advanced Vulnerability Analysis (CVE)"}) + "\n"
+        cve_results = get_cve_scan_data(safe_target)
+        for item in cve_results:
+            if 'category' not in item:
+                 item['category'] = "Vulnerability Analysis (CVE)"
+            item['timestamp'] = datetime.now().strftime("%H:%M:%S")
+            findings.append(item)
+            yield json.dumps(item) + "\n"
+
+        # 2. TLS/SSL Security Analysis
+        yield json.dumps({"type": "section", "title": "TLS/SSL Security Analysis"}) + "\n"
+        tls_results = get_tls_check_data(safe_target)
+        for item in tls_results:
+            item['category'] = "TLS Security"
+            findings.append(item)
+            yield json.dumps({"type": "finding", "tool": "TLS Check", "severity": item.get('severity', 'Info'), "message": item.get('message', '')}) + "\n"
+
+        # 3. Nmap (Network & Vuln)
         yield json.dumps({"type": "section", "title": "Network Vulnerability Scan (Nmap)"}) + "\n"
         nmap_path = find_tool("nmap")
         if nmap_path:
@@ -1657,13 +1675,13 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
         else:
              yield json.dumps({"type": "warning", "message": "Nmap not found."}) + "\n"
 
-        # 2. Nikto (Web Server)
+        # 4. Nikto (Web Server)
         yield json.dumps({"type": "section", "title": "Web Server Security (Nikto)"}) + "\n"
-        nikto_path = "tools/nikto/program/nikto.pl"
-        if os.path.exists(nikto_path):
+        nikto_path = find_tool("nikto")
+        if nikto_path:
             yield json.dumps({"type": "info", "message": "Running Nikto..."}) + "\n"
             # -h target, -Tuning 123b (Interest), -maxtime 5m
-            cmd = ["perl", nikto_path, "-h", safe_target, "-Tuning", "123b", "-maxtime", "300"]
+            cmd = [nikto_path, "-h", safe_target, "-Tuning", "123b", "-maxtime", "300"]
             if shutil.which("stdbuf"):
                 cmd = ["stdbuf", "-oL"] + cmd
 
@@ -1686,7 +1704,7 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
         else:
             yield json.dumps({"type": "warning", "message": "Nikto not found."}) + "\n"
 
-        # 3. Wapiti (Web App)
+        # 5. Wapiti (Web App)
         yield json.dumps({"type": "section", "title": "Web Application Security (Wapiti)"}) + "\n"
         wapiti_path = find_tool("wapiti")
         if wapiti_path:
@@ -1711,7 +1729,7 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
         else:
              yield json.dumps({"type": "warning", "message": "Wapiti not found."}) + "\n"
 
-        # 4. SQLMap (Database)
+        # 6. SQLMap (Database)
         yield json.dumps({"type": "section", "title": "Database Security (SQLMap)"}) + "\n"
         sqlmap_path = find_tool("sqlmap")
         if sqlmap_path:
@@ -1749,32 +1767,15 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
             if not findings:
                  findings.append({"tool": "System", "severity": "Info", "message": "No specific vulnerabilities identified by tools.", "timestamp": datetime.now().strftime("%H:%M:%S")})
 
-            report_path = generate_professional_pdf_report(safe_target, findings, title="Vulnerability Assessment & Penetration Testing Report", start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"), duration=duration)
-            yield json.dumps({"type": "success", "message": "PDF Report Ready for Download."}) + "\n"
+            date_str = datetime.now().strftime("%b %Y").upper()
+            report_filename = f"WEB APPLICATION VAPT REPORT - IIT MADRAS - ({safe_target}) - {date_str}-1.pdf"
+
+            report_path = generate_professional_pdf_report(safe_target, findings, title="Vulnerability Assessment & Penetration Testing Report", output_filename=report_filename, start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"), duration=duration)
+            yield json.dumps({"type": "success", "message": "PDF Report Ready for Download.", "report_filename": report_filename}) + "\n"
         except Exception as e:
             yield json.dumps({"type": "error", "message": f"PDF Gen Failed: {str(e)}"}) + "\n"
 
     return StreamingResponse(vapt_generator(), media_type="text/plain")
-
-@app.get("/vapt-download-pdf")
-def download_vapt_pdf(target: str, user: dict = Depends(get_current_user)):
-    # Match logic in vapt_scan/validate_target
-    clean_target = target.strip().replace("http://", "").replace("https://", "").split("/")[0].split(":")[0]
-    safe_target = "".join(c for c in clean_target if c.isalnum() or c in ".-_")
-    file_path = f"reports/vapt/VAPT_Report_{safe_target}.pdf"
-    
-    if os.path.exists(file_path):
-        return FileResponse(file_path, filename=f"VAPT_Report_{safe_target}.pdf", media_type='application/pdf')
-    
-    # Fallback: Generate Error PDF to ensure user gets a PDF format
-    error_filename = f"Error_Report_{safe_target}.pdf"
-    error_path = f"reports/general/{error_filename}"
-    os.makedirs("reports/general", exist_ok=True)
-    
-    findings = [{"severity": "High", "tool": "System", "message": "The requested VAPT report could not be found. Please ensure the scan completed successfully.", "timestamp": datetime.now().strftime("%H:%M:%S")}]
-    generate_professional_pdf_report(safe_target, findings, title="Report Not Found", output_filename=error_filename)
-    
-    return FileResponse(error_path, filename=error_filename, media_type='application/pdf')
 
 class ProfessionalPDF(FPDF):
     def __init__(self, title="Security Assessment Report"):
@@ -3064,9 +3065,9 @@ def run_scan_job(req_id, scan_type, target):
 
             update_status("Running Web Scanners...")
             # 4. Nikto (Path Check)
-            nikto_path = os.path.join("tools", "nikto", "program", "nikto.pl")
-            if os.path.exists(nikto_path):
-                cmd = ["perl", nikto_path, "-h", safe_target, "-Tuning", "123b", "-maxtime", "120"]
+            nikto_path = shutil.which("nikto")
+            if nikto_path:
+                cmd = [nikto_path, "-h", safe_target, "-Tuning", "123b", "-maxtime", "120"]
                 try:
                     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                     for line in process.stdout:
