@@ -252,7 +252,7 @@ function runPortScan() {
         } else if (data.type === 'success') {
              const btn = document.getElementById('ps_download_btn');
              btn.classList.remove('d-none');
-             btn.onclick = () => downloadFile(`/download-report/${data.report_filename}`);
+             btn.onclick = () => downloadFile(`/download-report/${encodeURIComponent(data.report_filename)}`);
              document.getElementById('ps_status').innerText = data.message;
         }
     });
@@ -308,7 +308,7 @@ function runIPRangeScan() {
         } else if (data.type === 'success') {
              const btn = document.getElementById('ir_download_btn');
              btn.classList.remove('d-none');
-             btn.onclick = () => downloadFile(`/download-report/${data.report_filename}`);
+             btn.onclick = () => downloadFile(`/download-report/${encodeURIComponent(data.report_filename)}`);
         }
     });
 }
@@ -431,7 +431,7 @@ function runNetworkMonitor() {
         if (data.type === 'success') {
              const btn = document.getElementById('nm_download_btn');
              btn.classList.remove('d-none');
-             btn.onclick = () => downloadFile(`/download-report/${data.report_filename}`);
+             btn.onclick = () => downloadFile(`/download-report/${encodeURIComponent(data.report_filename)}`);
         }
 
     }, () => {
@@ -585,7 +585,7 @@ function runCompliance() {
         } else if (data.type === 'success') {
              const btn = document.getElementById('comp_download_btn');
              btn.classList.remove('d-none');
-             btn.onclick = () => downloadFile(`/download-report/${data.report_filename}`);
+             btn.onclick = () => downloadFile(`/download-report/${encodeURIComponent(data.report_filename)}`);
              document.getElementById('comp_status').innerHTML = '<span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Completed</span>';
         }
     });
@@ -698,7 +698,7 @@ function runVAPT() {
              
         } else if (data.type === 'success') {
              // Enable download
-             btn.onclick = (e) => { e.preventDefault(); downloadFile(`/download-report/${data.report_filename}`); };
+             btn.onclick = (e) => { e.preventDefault(); downloadFile(`/download-report/${encodeURIComponent(data.report_filename)}`); };
              btn.classList.remove('disabled');
              document.getElementById('vapt_status').innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i> Scan Complete</span>';
              
@@ -838,7 +838,7 @@ function runVirusScan() {
         else if (data.type === 'success') {
              if (data.report_filename) {
                  dlBtn.classList.remove('d-none');
-                 dlBtn.onclick = () => downloadFile(`/download-report/${data.report_filename}`);
+                 dlBtn.onclick = () => downloadFile(`/download-report/${encodeURIComponent(data.report_filename)}`);
              }
              
              statusText.innerText = "Scan Complete";
@@ -1029,7 +1029,7 @@ function runCVEScan() {
         } else if (data.type === 'success') {
              const btn = document.getElementById('cve_download_btn');
              btn.classList.remove('d-none');
-             btn.onclick = () => downloadFile(`/download-report/${data.report_filename}`);
+             btn.onclick = () => downloadFile(`/download-report/${encodeURIComponent(data.report_filename)}`);
              document.getElementById('cve_status').innerHTML = `<span class="text-success fw-bold"><i class="fas fa-check-circle me-2"></i>Analysis Complete</span>`;
              
              if (itemsAdded === 0) {
@@ -1136,7 +1136,7 @@ function runTLSCheck() {
         } else if (data.type === 'success') {
              const btn = document.getElementById('tls_download_btn');
              btn.classList.remove('d-none');
-             btn.onclick = () => downloadFile(`/download-report/${data.report_filename}`);
+             btn.onclick = () => downloadFile(`/download-report/${encodeURIComponent(data.report_filename)}`);
         }
     });
 }
@@ -1201,7 +1201,7 @@ function runBulkScan() {
                     } else if (data.type === 'success') {
                          const btn = document.getElementById('bulk_download_btn');
                          btn.classList.remove('d-none');
-                         btn.onclick = () => downloadFile(`/download-report/${data.report_filename}`);
+                         btn.onclick = () => downloadFile(`/download-report/${encodeURIComponent(data.report_filename)}`);
                     }
                 } catch(e) {}
             }
@@ -1420,7 +1420,7 @@ function loadMyRequests() {
                 <td><span class="badge ${req.status === 'Completed' ? 'bg-success' : (req.status === 'Review Pending' ? 'bg-info' : 'bg-warning text-dark')}">${req.status}</span></td>
                 <td>
                     ${(req.report_filename && req.status === 'Completed') ? 
-                    `<button onclick="downloadFile('/download-report/${req.report_filename}')" class="btn btn-sm btn-outline-primary"><i class="fas fa-download me-1"></i> Download PDF</button>` : 
+                    `<button onclick="downloadFile('/download-report/${encodeURIComponent(req.report_filename)}')" class="btn btn-sm btn-outline-primary"><i class="fas fa-download me-1"></i> Download PDF</button>` :
                     (req.status === 'Review Pending' ? '<span class="text-muted small fst-italic">Reviewing...</span>' : '<span class="text-muted small">-</span>')}
                 </td>
             </tr>
@@ -1442,7 +1442,7 @@ function loadAdminRequests() {
                 `;
             } else if (req.status === 'Review Pending') {
                 actionHtml = `
-                    <button class="btn btn-sm btn-outline-warning mb-1" onclick="downloadFile('/download-report/${req.report_filename}')"><i class="fas fa-eye"></i> Review PDF</button>
+                    <button class="btn btn-sm btn-outline-warning mb-1" onclick="downloadFile('/download-report/${encodeURIComponent(req.report_filename)}')"><i class="fas fa-eye"></i> Review PDF</button>
                     <br>
                     <div class="d-flex gap-1">
                         <button class="btn btn-sm btn-success flex-grow-1" onclick="handleReportAction(${req.id}, 'Release')">Release</button>
@@ -1453,7 +1453,7 @@ function loadAdminRequests() {
             } else if (req.report_filename) {
                 actionHtml = `
                     <span class="badge bg-success me-2">${req.status}</span>
-                    <button class="btn btn-sm btn-outline-warning" onclick="downloadFile('/download-report/${req.report_filename}')"><i class="fas fa-download"></i> PDF</button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="downloadFile('/download-report/${encodeURIComponent(req.report_filename)}')"><i class="fas fa-download"></i> PDF</button>
                     <button class="btn btn-sm btn-outline-secondary ms-1" onclick="deleteRequest(${req.id})"><i class="fas fa-trash"></i></button>
                 `;
             } else {

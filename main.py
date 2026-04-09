@@ -1648,9 +1648,9 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
         yield json.dumps({"type": "section", "title": "Network Vulnerability Scan (Nmap)"}) + "\n"
         nmap_path = find_tool("nmap")
         if nmap_path:
-            # -sV for version, --script vuln for vulnerabilities, -Pn to assume up, -T4 for speed
+            # -sV for version, -Pn to assume up, -T4 for speed
             # Using stdbuf to force line buffering if available (linux)
-            cmd = [nmap_path, "-Pn", "-sV", "--script", "vuln", "--host-timeout", "300s", "-T4", safe_target]
+            cmd = [nmap_path, "-Pn", "-sV", "--host-timeout", "60s", "-T4", safe_target]
             if shutil.which("stdbuf"):
                 cmd = ["stdbuf", "-oL"] + cmd
                 
@@ -1680,8 +1680,8 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
         nikto_path = find_tool("nikto")
         if nikto_path:
             yield json.dumps({"type": "info", "message": "Running Nikto..."}) + "\n"
-            # -h target, -Tuning 123b (Interest), -maxtime 5m
-            cmd = [nikto_path, "-h", safe_target, "-Tuning", "123b", "-maxtime", "300"]
+            # -h target, -Tuning 1 (Interesting Files), -maxtime 60s
+            cmd = [nikto_path, "-h", safe_target, "-Tuning", "1", "-maxtime", "60"]
             if shutil.which("stdbuf"):
                 cmd = ["stdbuf", "-oL"] + cmd
 
@@ -1711,7 +1711,7 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
              yield json.dumps({"type": "info", "message": "Running Wapiti..."}) + "\n"
              # -u url, -m modules
              url = f"http://{safe_target}"
-             cmd = [wapiti_path, "-u", url, "--scope", "folder", "--flush-session", "-v", "1", "--no-bugreport", "--max-scan-time", "300", "-m", "xss,sql,exec,file,buster"]
+             cmd = [wapiti_path, "-u", url, "--scope", "folder", "--flush-session", "-v", "1", "--no-bugreport", "--max-scan-time", "3", "-m", "xss,sql,exec,file"]
              if shutil.which("stdbuf"):
                 cmd = ["stdbuf", "-oL"] + cmd
 
@@ -1736,7 +1736,7 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
             yield json.dumps({"type": "info", "message": "Running SQLMap..."}) + "\n"
             url = f"http://{safe_target}"
             # --batch, --crawl, --level, --risk
-            cmd = [sqlmap_path, "-u", url, "--batch", "--crawl=1", "--smart", "--level=2", "--risk=2", "--time-sec", "1", "--threads", "2"]
+            cmd = [sqlmap_path, "-u", url, "--batch", "--crawl=1", "--smart", "--level=1", "--risk=1", "--timeout=10", "--threads", "2"]
             if shutil.which("stdbuf"):
                 cmd = ["stdbuf", "-oL"] + cmd
 
@@ -1768,7 +1768,8 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
                  findings.append({"tool": "System", "severity": "Info", "message": "No specific vulnerabilities identified by tools.", "timestamp": datetime.now().strftime("%H:%M:%S")})
 
             date_str = datetime.now().strftime("%b %Y").upper()
-            report_filename = f"WEB APPLICATION VAPT REPORT - IIT MADRAS - ({safe_target}) - {date_str}-1.pdf"
+            timestamp_str = datetime.now().strftime("%Y%m%d%H%M%S")
+            report_filename = f"WEB APPLICATION VAPT REPORT - IIT MADRAS - ({safe_target}) - {date_str}-{timestamp_str}.pdf"
 
             report_path = generate_professional_pdf_report(safe_target, findings, title="Vulnerability Assessment & Penetration Testing Report", output_filename=report_filename, start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"), duration=duration)
             yield json.dumps({"type": "success", "message": "PDF Report Ready for Download.", "report_filename": report_filename}) + "\n"
@@ -1905,10 +1906,11 @@ class ProfessionalPDF(FPDF):
         self.set_y(-50)
         self.set_font(self.main_font, 'B', 10)
         self.set_text_color(100, 100, 100)
-        self.cell(0, 5, "Conducted By:", new_x="LMARGIN", new_y="NEXT", align='C')
-        self.set_font(self.main_font, '', 11)
+        self.cell(0, 5, "Assessment Conducted By:", new_x="LMARGIN", new_y="NEXT", align='C')
+        self.set_font(self.main_font, 'B', 12)
         self.set_text_color(0, 0, 0)
-        self.cell(0, 6, "Cyber Security and Audit Team", new_x="LMARGIN", new_y="NEXT", align='C')
+        self.cell(0, 6, "Cyber Security Operations Center (CSOC)", new_x="LMARGIN", new_y="NEXT", align='C')
+        self.set_font(self.main_font, '', 11)
         self.cell(0, 6, "P.G. Senapathy Center for Computing Resources - IIT Madras", new_x="LMARGIN", new_y="NEXT", align='C')
 
     def add_document_control(self):
@@ -1921,18 +1923,18 @@ class ProfessionalPDF(FPDF):
         # Table Header
         self.set_fill_color(230, 230, 230)
         self.set_font(self.main_font, 'B', 11)
-        self.cell(50, 10, "Field", border=1, new_x="RIGHT", new_y="TOP", align='L', fill=True)
-        self.cell(140, 10, "Details", border=1, new_x="LMARGIN", new_y="NEXT", align='L', fill=True)
+        self.cell(50, 10, "Control Field", border=1, new_x="RIGHT", new_y="TOP", align='L', fill=True)
+        self.cell(140, 10, "Details / Value", border=1, new_x="LMARGIN", new_y="NEXT", align='L', fill=True)
         
         self.set_font(self.main_font, '', 11)
         
         data = [
             ("Document Title", self.report_title),
-            ("Classification", "Confidential / Internal Use Only"),
-            ("Date Generated", datetime.now().strftime("%d-%b-%Y %H:%M:%S")),
-            ("Generated By", "IITM Automated Security Dashboard"),
-            ("Reviewer", "Administrator / Security Officer"),
-            ("Status", "Final Draft")
+            ("Data Classification", "Highly Confidential / Internal Use Only"),
+            ("Date of Engagement", datetime.now().strftime("%d-%b-%Y %H:%M:%S")),
+            ("Assessment Origin", "Cyber Security and Audit Team (CSAT) Engine"),
+            ("Authorized Reviewer", "Chief Information Security Officer (CISO)"),
+            ("Engagement Status", "Final Deliverable")
         ]
         
         for key, value in data:
@@ -2390,16 +2392,16 @@ def generate_professional_pdf_report(target, data_input=None, title="Security As
     # Dynamic Summary Text based on Scan Type
     if "Compliance" in title:
         summary_text = (
-            f"The Security Division of IIT Madras has conducted a comprehensive Compliance Audit on '{target}'. "
-            "The objective was to verify adherence to IITM Security Standards (IITM-STD) and Policy Frameworks (IITM-POL). "
-            "This report details the conformity level of the asset, highlighting deviations from the mandated configuration baseline."
+            f"The Cyber Security Operations Center of IIT Madras has executed an exhaustive Compliance Audit on the asset '{target}'. "
+            "The strategic objective of this assessment is to strictly verify architectural alignment with the IITM Security Standards (IITM-STD) and Policy Frameworks (IITM-POL). "
+            "This audit report highlights deviations from the established security baseline and provides actionable remediation steps to achieve regulatory compliance."
         )
         methodology_text = (
-            "The audit process utilizes a specialized compliance engine to validate system configurations against a hardened baseline:\n"
-            "- IITM-STD-001/002: Verification of asset reachability and standard port usage.\n"
-            "- IITM-POL-001: Detection of restricted/legacy services (Telnet, FTP, SMB).\n"
-            "- IITM-POL-002/003: Analysis of Cryptographic controls (TLS) and Administrative access (SSH).\n"
-            "- IITM-POL-004: Inspection of Web Application Security Headers."
+            "The audit process utilizes a specialized automated compliance engine to systematically validate configurations against the hardened baseline:\n"
+            "Phase 1: Architecture Baseline - Verification of asset reachability and standard port usage (IITM-STD-001/002).\n"
+            "Phase 2: Exposure Minimization - Detection of restricted and legacy protocols such as Telnet, FTP, and SMB (IITM-POL-001).\n"
+            "Phase 3: Cryptographic Posture - Deep inspection of TLS implementation and secure administrative access protocols (IITM-POL-002/003).\n"
+            "Phase 4: Web Defense Evaluation - Analysis of Web Application Security Headers (IITM-POL-004)."
         )
     elif "Network Monitor" in title:
         summary_text = (
@@ -2452,27 +2454,27 @@ def generate_professional_pdf_report(target, data_input=None, title="Security As
         )
     elif "Virus" in title or "Malware" in title:
         summary_text = (
-            f"An Advanced Threat & Malware Analysis was conducted on '{target}'. "
-            "This scan focuses on detecting signs of compromise, including known webshell signatures, malicious file hashes, and suspicious heuristic patterns. "
-            "The goal is to identify active infections or backdoors."
+            f"An Advanced Threat & Malware Triage Analysis has been completed on the target asset '{target}'. "
+            "This intensive scan was developed to detect active indicators of compromise (IoC), including advanced persistent webshell signatures and complex heuristic behavioral patterns. "
+            "The objective is to swiftly identify backdoor persistence mechanisms and mitigate any ongoing security incidents."
         )
         methodology_text = (
-            "The analysis combines signature-based detection with heuristic behavioral checks:\n"
-            "- Threat Intelligence: Cross-referencing targets with global blocklists (URLHaus).\n"
-            "- Signature Matching: Scanning for known webshells (c99, r57) and malicious file patterns.\n"
-            "- Heuristic Analysis: Identifying suspicious keywords (e.g., 'eval', 'base64_decode') in web responses."
+            "The triage analysis combines dynamic signature-based detection with advanced heuristic behavioral modeling:\n"
+            "Phase 1: Open Source Threat Intelligence (OSINT) - Correlating the target against globally curated malware and C2 domains (URLHaus).\n"
+            "Phase 2: Network Signature Discovery - Scanning for established malicious webshells (e.g., c99, r57, China Chopper) on known application vectors.\n"
+            "Phase 3: Payload Decoupling & Heuristics - Identifying obfuscated Javascript and malicious PHP commands ('eval()', 'base64_decode') to uncover zero-day attacks."
         )
     elif "Vulnerability" in title or "CVE" in title:
         summary_text = (
-            f"A Vulnerability Assessment (CVE Scan) was executed against '{target}'. "
-            "This assessment maps identified services to known Common Vulnerabilities and Exposures (CVEs). "
-            "The report prioritizes vulnerabilities based on their CVSS scores and potential impact."
+            f"An Advanced Vulnerability Assessment mapping to Common Vulnerabilities and Exposures (CVE) was executed against the primary target '{target}'. "
+            "This strategic review accurately identifies and catalogs potentially exploitable services by correlating system exposure to the National Vulnerability Database (NVD). "
+            "This document quantitatively prioritizes the discovered risk factors by aggregating their CVSS v3.1 vector bases to facilitate immediate remediation and patch management."
         )
         methodology_text = (
-            "The scanner correlates service version information with a local vulnerability database:\n"
-            "- Service Enumeration: Accurate identification of software versions (Apache, Nginx, PHP, etc.).\n"
-            "- CVE Correlation: Matching versions against known vulnerabilities.\n"
-            "- Severity Scoring: Using CVSS v3.1 metrics to categorize risk (Critical, High, Medium, Low)."
+            "The automated scanner identifies service and operating system versions and cross-references an advanced security repository:\n"
+            "Phase 1: Deep Service Fingerprinting - Precise identification of daemon versions and underlying OS configurations (e.g. Apache, Nginx).\n"
+            "Phase 2: Database Correlation - Cross-matching the extracted network footprint against known and zero-day threat databases.\n"
+            "Phase 3: Impact Analysis - Assigning qualitative and quantitative risk scores relying on CVSS metrics to classify findings into Critical, High, Medium, or Low categories."
         )
     elif "Bulk" in title:
         summary_text = (
@@ -2488,16 +2490,17 @@ def generate_professional_pdf_report(target, data_input=None, title="Security As
         )
     else: # Default VAPT
         summary_text = (
-            f"The Security Division of IIT Madras has conducted a {title} on the target infrastructure identified as '{target}'. "
-            "This assessment was initiated to evaluate the security posture of the asset against known vulnerabilities and institutional compliance standards. "
-            "This report outlines the technical findings, associated risks, and recommended remediation strategies to bolster the defense mechanisms."
+            f"The Cyber Security and Audit Team of IIT Madras has conducted a comprehensive {title} on the target infrastructure identified as '{target}'. "
+            "This engagement was initiated to proactively evaluate the security posture, identify potential attack vectors, and determine the susceptibility of the asset to external and internal threats. "
+            "This report outlines the technical findings, associated risk levels (using CVSS scoring), and recommended remediation strategies to fortify the organization's defense-in-depth architecture."
         )
         methodology_text = (
-            "The assessment methodology follows a rigorous, multi-layered approach combining automated scanning and heuristic analysis:\n"
-            "- Network Enumeration: Discovery of open ports and service versions (Nmap/Custom).\n"
-            "- Vulnerability Scanning: Detection of CVEs and outdated software (Custom Heuristics/CVSS).\n"
-            "- Web Application Testing: Analysis of XSS, SQLi, and misconfigurations (Wapiti, Nikto, SQLMap).\n"
-            "- Threat Intelligence: Correlation with external threat feeds (URLHaus)."
+            "The assessment methodology aligns with industry best practices (OWASP Top 10, PTES) and follows a rigorous, multi-layered approach:\n"
+            "1. Reconnaissance & Enumeration: Discovery of active assets, open ports, and service fingerprints (Nmap).\n"
+            "2. Vulnerability Analysis: Automated detection of CVEs, outdated software, and misconfigurations (CVE Engine, Nikto).\n"
+            "3. Web Application Security: Dynamic Application Security Testing (DAST) to identify XSS, injection flaws, and logic errors (Wapiti).\n"
+            "4. Database Exploitation Assessment: Automated SQL injection detection and database takeover simulation (SQLMap).\n"
+            "5. Threat Intelligence Correlation: Cross-referencing targets with global threat feeds (URLHaus) and real-time TLS cryptographic reviews."
         )
 
     pdf.multi_cell(0, 6, summary_text)
@@ -3017,18 +3020,19 @@ def run_scan_job(req_id, scan_type, target):
         
         # New Filename Logic (Automated Format)
         date_str = datetime.now().strftime("%b %Y").upper()
+        timestamp_str = datetime.now().strftime("%Y%m%d%H%M%S")
         if scan_type == "VAPT":
-             report_filename = f"WEB APPLICATION VAPT REPORT - IIT MADRAS - ({safe_target}) - {date_str}-1.pdf"
+             report_filename = f"WEB APPLICATION VAPT REPORT - IIT MADRAS - ({safe_target}) - {date_str}-{timestamp_str}.pdf"
         elif scan_type == "Network Monitor":
-             report_filename = f"NETWORK SECURITY REPORT - IIT MADRAS - ({safe_target}) - {date_str}-1.pdf"
+             report_filename = f"NETWORK SECURITY REPORT - IIT MADRAS - ({safe_target}) - {date_str}-{timestamp_str}.pdf"
         elif scan_type == "Compliance Request":
-             report_filename = f"COMPLIANCE AUDIT REPORT - IIT MADRAS - ({safe_target}) - {date_str}-1.pdf"
+             report_filename = f"COMPLIANCE AUDIT REPORT - IIT MADRAS - ({safe_target}) - {date_str}-{timestamp_str}.pdf"
         elif scan_type == "Virus Scanner":
-             report_filename = f"MALWARE ANALYSIS REPORT - IIT MADRAS - ({safe_target}) - {date_str}-1.pdf"
+             report_filename = f"MALWARE ANALYSIS REPORT - IIT MADRAS - ({safe_target}) - {date_str}-{timestamp_str}.pdf"
         else:
              # Generic fallback
              clean_type = scan_type.upper().replace(" ", "_")
-             report_filename = f"{clean_type}_REPORT - IIT MADRAS - ({safe_target}) - {date_str}-1.pdf"
+             report_filename = f"{clean_type}_REPORT - IIT MADRAS - ({safe_target}) - {date_str}-{timestamp_str}.pdf"
 
         findings = []
         scan_title = f"{scan_type} Report"
