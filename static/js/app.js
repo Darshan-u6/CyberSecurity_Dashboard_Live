@@ -698,7 +698,7 @@ function runVAPT() {
              
         } else if (data.type === 'success') {
              // Enable download
-             btn.onclick = (e) => { e.preventDefault(); downloadFile(`/vapt-download-pdf?target=${target}`); };
+             btn.onclick = (e) => { e.preventDefault(); downloadFile(`/download-report/${data.report_filename}`); };
              btn.classList.remove('disabled');
              document.getElementById('vapt_status').innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i> Scan Complete</span>';
              
