@@ -1644,21 +1644,59 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
             findings.append(item)
             yield json.dumps({"type": "finding", "tool": "TLS Check", "severity": item.get('severity', 'Info'), "message": item.get('message', '')}) + "\n"
 
+        # Timeout Wrapper for Tools - Generator version for real-time streaming
+        def run_tool_with_timeout_stream(cmd, timeout=45):
+            import select
+            import os
+            import signal
+            import re
+            def strip_ansi(s):
+                return re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', s)
+
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, preexec_fn=os.setsid)
+            start_t = time.time()
+
+            try:
+                while True:
+                    if time.time() - start_t > timeout:
+                        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                        yield "[!] Process timeout reached."
+                        break
+
+                    reads, _, _ = select.select([process.stdout], [], [], 1.0)
+                    if process.stdout in reads:
+                        line = process.stdout.readline()
+                        if not line:
+                            if process.poll() is not None:
+                                break
+                            continue
+                        line = strip_ansi(line).strip()
+                        if line:
+                            yield line
+                    else:
+                        if process.poll() is not None:
+                            break
+            except Exception as e:
+                try:
+                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                except:
+                    pass
+                yield f"[!] Error: {str(e)}"
+            finally:
+                if process.poll() is None:
+                    try:
+                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    except:
+                        pass
+                process.wait()
+
         # 3. Nmap (Network & Vuln)
         yield json.dumps({"type": "section", "title": "Network Vulnerability Scan (Nmap)"}) + "\n"
         nmap_path = find_tool("nmap")
         if nmap_path:
-            # -sV for version, --script vuln for vulnerabilities, -Pn to assume up, -T4 for speed
-            # Using stdbuf to force line buffering if available (linux)
-            cmd = [nmap_path, "-Pn", "-sV", "--script", "vuln", "--host-timeout", "300s", "-T4", safe_target]
-            if shutil.which("stdbuf"):
-                cmd = ["stdbuf", "-oL"] + cmd
-                
+            cmd = [nmap_path, "-Pn", "-sV", "--host-timeout", "60s", "-T4", safe_target]
             try:
-                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-                for line in process.stdout:
-                    line = line.strip()
-                    if not line: continue
+                for line in run_tool_with_timeout_stream(cmd, timeout=30):
                     if "VULNERABLE" in line or "CVE-" in line:
                          yield add_finding_internal("Nmap", "High", line, "Network Vulnerability")
                          log_content.append(f"[High] {line}")
@@ -1668,7 +1706,6 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
                     elif "Running:" in line or "OS details:" in line:
                          yield add_finding_internal("Nmap", "Info", line, "OS Detection")
                          log_content.append(f"[Info] {line}")
-                process.wait()
             except Exception as e:
                 err = f"Nmap Error: {str(e)}"
                 yield add_finding_internal("Nmap", "Medium", err, "Error")
@@ -1680,24 +1717,16 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
         nikto_path = find_tool("nikto")
         if nikto_path:
             yield json.dumps({"type": "info", "message": "Running Nikto..."}) + "\n"
-            # -h target, -Tuning 123b (Interest), -maxtime 5m
-            cmd = [nikto_path, "-h", safe_target, "-Tuning", "123b", "-maxtime", "300"]
-            if shutil.which("stdbuf"):
-                cmd = ["stdbuf", "-oL"] + cmd
-
+            cmd = [nikto_path, "-h", safe_target, "-Tuning", "1", "-maxtime", "30"]
             try:
-                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                for line in process.stdout:
-                    line = line.strip()
+                for line in run_tool_with_timeout_stream(cmd, timeout=35):
                     if "+ " in line:
-                         # Heuristic severity
                          severity = "Info"
                          if "OSVDB" in line or "CVE" in line: severity = "Medium"
                          if "XSS" in line or "SQL" in line: severity = "High"
                          
                          yield add_finding_internal("Nikto", severity, line, "Web Server")
                          log_content.append(f"[{severity}] {line}")
-                process.wait()
             except Exception as e:
                  err = f"Nikto Error: {str(e)}"
                  yield add_finding_internal("Nikto", "Medium", err, "Error")
@@ -1709,20 +1738,16 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
         wapiti_path = find_tool("wapiti")
         if wapiti_path:
              yield json.dumps({"type": "info", "message": "Running Wapiti..."}) + "\n"
-             # -u url, -m modules
              url = f"http://{safe_target}"
-             cmd = [wapiti_path, "-u", url, "--scope", "folder", "--flush-session", "-v", "1", "--no-bugreport", "--max-scan-time", "300", "-m", "xss,sql,exec,file,buster"]
-             if shutil.which("stdbuf"):
-                cmd = ["stdbuf", "-oL"] + cmd
-
+             cmd = [wapiti_path, "-u", url, "--scope", "folder", "--flush-session", "-v", "1", "--no-bugreport", "--max-scan-time", "30", "-m", "xss,sql,exec,file"]
              try:
-                 process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                 for line in process.stdout:
-                      line = line.strip()
-                      if "Vulnerability" in line or "[+]" in line:
-                          yield add_finding_internal("Wapiti", "High", line, "Web App")
-                          log_content.append(f"[High] {line}")
-                 process.wait()
+                 for line in run_tool_with_timeout_stream(cmd, timeout=40):
+                     if "Vulnerability" in line or "[+]" in line or "Found" in line or "[*]" in line:
+                          severity = "Medium"
+                          if "SQL Injection" in line or "Command execution" in line: severity = "Critical"
+                          if "XSS" in line: severity = "High"
+                          yield add_finding_internal("Wapiti", severity, line, "Web Application")
+                          log_content.append(f"[{severity}] {line}")
              except Exception as e:
                  err = f"Wapiti Error: {str(e)}"
                  yield add_finding_internal("Wapiti", "Medium", err, "Error")
@@ -1733,24 +1758,17 @@ def vapt_scan(target: str, user: dict = Depends(get_current_admin)):
         yield json.dumps({"type": "section", "title": "Database Security (SQLMap)"}) + "\n"
         sqlmap_path = find_tool("sqlmap")
         if sqlmap_path:
-            yield json.dumps({"type": "info", "message": "Running SQLMap..."}) + "\n"
-            url = f"http://{safe_target}"
-            # --batch, --crawl, --level, --risk
-            cmd = [sqlmap_path, "-u", url, "--batch", "--crawl=1", "--smart", "--level=2", "--risk=2", "--time-sec", "1", "--threads", "2"]
-            if shutil.which("stdbuf"):
-                cmd = ["stdbuf", "-oL"] + cmd
-
-            try:
-                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                for line in process.stdout:
-                    line = line.strip()
-                    if "injectable" in line or ("parameter" in line and "appears" in line):
-                        yield add_finding_internal("SQLMap", "Critical", line, "Database")
-                        log_content.append(f"[Critical] {line}")
-                process.wait()
-            except Exception as e:
-                err = f"SQLMap Error: {str(e)}"
-                yield add_finding_internal("SQLMap", "Medium", err, "Error")
+             yield json.dumps({"type": "info", "message": "Running SQLMap..."}) + "\n"
+             url = f"http://{safe_target}"
+             cmd = [sqlmap_path, "-u", url, "--batch", "--crawl=1", "--smart", "--level=1", "--risk=1", "--timeout=10", "--threads", "2"]
+             try:
+                 for line in run_tool_with_timeout_stream(cmd, timeout=30):
+                     if "injectable" in line or ("parameter" in line and "appears" in line) or "vulnerable" in line.lower():
+                          yield add_finding_internal("SQLMap", "Critical", line, "Database")
+                          log_content.append(f"[Critical] {line}")
+             except Exception as e:
+                 err = f"SQLMap Error: {str(e)}"
+                 yield add_finding_internal("SQLMap", "Medium", err, "Error")
         else:
              yield json.dumps({"type": "warning", "message": "SQLMap not found."}) + "\n"
 
