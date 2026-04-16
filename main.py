@@ -574,8 +574,13 @@ def virus_scan(target: str, user: dict = Depends(get_current_admin)):
                 try:
                     # Specific User-Agent to elicit response from some C2s
                     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-                    r = requests.get(f"{proto}://{safe_target}", timeout=2, verify=False, headers=headers)
+                    r = requests.get(f"{proto}://{safe_target}", timeout=2, verify=True, headers=headers)
                     http_context += str(r.headers) + r.text[:5000] # Increased limit
+                except requests.exceptions.SSLError:
+                    msg = f"SSL Verification Failed for {proto}://{safe_target} (IITM-POL-002 Violation)"
+                    ts = datetime.now().strftime("%H:%M:%S")
+                    findings.append({"tool": "Network Signature", "category": "Cryptography", "severity": "High", "message": msg, "timestamp": ts})
+                    yield json.dumps({"type": "alert", "data": {"tool": "SSL Check", "severity": "High", "message": msg}}) + "\n"
                 except: pass
         except: pass
 
@@ -611,10 +616,16 @@ def virus_scan(target: str, user: dict = Depends(get_current_admin)):
             elif sig['type'] == 'URI':
                  # Active check for URI
                  try:
+                     # Check if it should be HTTPS based on port or prefix, but here it's hardcoded to http
+                     # If it were https, we would need verify=True
                      url = f"http://{safe_target}/{sig['pattern']}"
-                     r = requests.head(url, timeout=1, verify=False)
+                     r = requests.head(url, timeout=1, verify=True)
                      if r.status_code == 200:
                          status_sig = "Detected"
+                 except requests.exceptions.SSLError:
+                     msg = f"SSL Verification Failed during URI check: {url}"
+                     ts = datetime.now().strftime("%H:%M:%S")
+                     findings.append({"tool": "Signature Scanner", "category": "Cryptography", "severity": "High", "message": msg, "timestamp": ts})
                  except: pass
 
             if status_sig == "Detected":
@@ -668,11 +679,17 @@ def virus_scan(target: str, user: dict = Depends(get_current_admin)):
                 
                 try:
                     # Generic connection test first
-                    requests.get(base_url, timeout=2, verify=False)
+                    try:
+                        requests.get(base_url, timeout=2, verify=True)
+                    except requests.exceptions.SSLError:
+                        msg = f"SSL Verification Failed for {base_url} (IITM-POL-002 Violation)"
+                        ts = datetime.now().strftime("%H:%M:%S")
+                        findings.append({"tool": "Webshell Scanner", "category": "Cryptography", "severity": "High", "message": msg, "timestamp": ts})
+                        yield json.dumps({"type": "alert", "message": msg}) + "\n"
                     
                     for shell in common_shells:
                         try:
-                            r = requests.get(f"{base_url}/{shell}", timeout=2, verify=False)
+                            r = requests.get(f"{base_url}/{shell}", timeout=2, verify=True)
                             if r.status_code == 200:
                                 # Verify signature (avoid false positives on custom 404 pages)
                                 content = r.text.lower()
@@ -691,7 +708,12 @@ def virus_scan(target: str, user: dict = Depends(get_current_admin)):
                         yield json.dumps({"type": "success", "message": f"Port {port} Webshell Scan Clean."}) + "\n"
                         
                     # Content Analysis
-                    r = requests.get(base_url, timeout=3, verify=False)
+                    try:
+                        r = requests.get(base_url, timeout=3, verify=True)
+                    except requests.exceptions.SSLError:
+                        # Error already reported above, but we need 'r' for content analysis if we continue
+                        # If SSL fails, we can't reliably get content analysis
+                        raise
                     content = r.text.lower()
                     suspicious_patterns = [
                         "<iframe", "eval(function(p,a,c,k,e,d)", "base64_decode", 
@@ -749,7 +771,7 @@ def check_tls(host: str = Query(...), user: dict = Depends(get_current_admin)):
             context = ssl.create_default_context()
             if is_ip:
                 context.check_hostname = False
-                context.verify_mode = ssl.CERT_NONE
+                context.verify_mode = ssl.CERT_REQUIRED
                 server_hostname = None
             else:
                 server_hostname = clean_host
@@ -821,6 +843,12 @@ def check_tls(host: str = Query(...), user: dict = Depends(get_current_admin)):
                             "data": {"key": "Certificate Expiry", "value": str(expiry_date), "status": f"{days_left} days left", "color": cert_color}
                         }) + "\n"
                             
+        except ssl.SSLCertVerificationError as e:
+            msg = f"SSL Verification Failed: {str(e)} (Untrusted Certificate)"
+            log_lines.append(f"CRITICAL: {msg}")
+            ts = datetime.now().strftime("%H:%M:%S")
+            findings.append({"tool": "TLS Scanner", "category": "Cryptography", "severity": "High", "message": msg, "timestamp": ts})
+            yield json.dumps({"type": "error", "message": msg}) + "\n"
         except Exception as e:
             log_lines.append(f"Error: {str(e)}")
             ts = datetime.now().strftime("%H:%M:%S")
@@ -1507,7 +1535,7 @@ def run_compliance_check(target: str, user: dict = Depends(get_current_admin)):
         try:
             context = ssl.create_default_context()
             context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
+            context.verify_mode = ssl.CERT_REQUIRED
             with socket.create_connection((safe_target, 443), timeout=2) as sock:
                 with context.wrap_socket(sock, server_hostname=safe_target) as ssock:
                     ver = ssock.version()
@@ -1521,6 +1549,9 @@ def run_compliance_check(target: str, user: dict = Depends(get_current_admin)):
                     else:
                         yield json.dumps({"type": "check", "category": "Compliance", "title": "IITM-POL-002: Encryption", "status": "FAIL", "details": f"Weak Protocol ({ver})"}) + "\n"
                         log_lines.append(f"IITM-POL-002: Encryption - FAIL ({ver})")
+        except ssl.SSLCertVerificationError as e:
+             yield json.dumps({"type": "check", "category": "Compliance", "title": "IITM-POL-002: Encryption", "status": "FAIL", "details": f"SSL Verification Failed: {str(e)}"}) + "\n"
+             log_lines.append(f"IITM-POL-002: Encryption - FAIL (SSL Verification Error)")
         except:
              # If port 443 is closed, we skip or check if 80 is open (if 80 open and 443 closed -> Fail)
              if socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex((safe_target, 80)) == 0:
@@ -1554,7 +1585,7 @@ def run_compliance_check(target: str, user: dict = Depends(get_current_admin)):
         if has_ssl or socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex((safe_target, 80)) == 0:
             try:
                 url = f"https://{safe_target}" if has_ssl else f"http://{safe_target}"
-                r = requests.get(url, timeout=2, verify=False)
+                r = requests.get(url, timeout=2, verify=True)
                 h = r.headers
                 missing = []
                 if "Strict-Transport-Security" not in h and has_ssl: missing.append("HSTS")
@@ -3649,9 +3680,12 @@ def get_virus_scan_data(target):
                         # HTTP
                         proto = "https" if port == 443 else "http"
                         try:
-                            r = requests.get(f"{proto}://{clean_target}", timeout=2, verify=False)
+                            r = requests.get(f"{proto}://{clean_target}", timeout=2, verify=True)
                             banner = r.headers.get("Server", "")
                             banner += " " + r.headers.get("X-Powered-By", "")
+                        except requests.exceptions.SSLError:
+                            msg = f"SSL Verification Failed for {proto}://{clean_target} on Port {port}"
+                            findings.append({"severity": "High", "tool": "Heuristic", "message": msg, "timestamp": datetime.now().strftime("%H:%M:%S")})
                         except: pass
                     else:
                         # TCP Banner
@@ -3697,7 +3731,7 @@ def get_tls_check_data(host):
         context = ssl.create_default_context()
         if is_ip:
             context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
+            context.verify_mode = ssl.CERT_REQUIRED
             server_hostname = None
         else:
             server_hostname = clean_host
@@ -3731,6 +3765,9 @@ def get_tls_check_data(host):
                     else:
                         findings.append({"severity": "Info", "tool": "TLS Check", "message": f"Certificate Valid ({days_left} days left)", "timestamp": datetime.now().strftime("%H:%M:%S")})
                         
+    except ssl.SSLCertVerificationError as e:
+        msg = f"SSL Verification Failed: {str(e)} (Untrusted Certificate)"
+        findings.append({"severity": "High", "tool": "TLS Check", "message": msg, "timestamp": datetime.now().strftime("%H:%M:%S")})
     except Exception as e:
         log_data.append(f"Error: {str(e)}")
         findings.append({"severity": "High", "tool": "TLS Check", "message": f"Connection Error: {str(e)}", "timestamp": datetime.now().strftime("%H:%M:%S")})
@@ -3756,10 +3793,22 @@ def get_cve_scan_data(target):
                 if port in [80, 443, 8080, 8443]:
                     try:
                         proto = "https" if port in [443, 8443] else "http"
-                        r = requests.head(f"{proto}://{target}:{port}", timeout=2, verify=False)
+                        r = requests.head(f"{proto}://{target}:{port}", timeout=2, verify=True)
                         server = r.headers.get("Server", "")
                         powered = r.headers.get("X-Powered-By", "")
                         banner = f"{server} {powered}".strip()
+                    except requests.exceptions.SSLError:
+                        findings.append({
+                            "type": "finding",
+                            "tool": "Advanced CVE Engine",
+                            "cve": "IITM-POL-002 Violation",
+                            "cvss": 5.0,
+                            "severity": "High",
+                            "description": f"SSL Verification Failed for {proto}://{target}:{port}",
+                            "recommendation": "Install a valid SSL certificate.",
+                            "message": f"Port {port}: SSL Verification Failed (Untrusted Certificate)",
+                            "details": "The certificate chain is untrusted or self-signed."
+                        })
                     except: pass
                 else:
                     try:
@@ -4028,7 +4077,7 @@ def get_compliance_check_data(target):
     try:
         context = ssl.create_default_context()
         context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
+        context.verify_mode = ssl.CERT_REQUIRED
         with socket.create_connection((safe_target, 443), timeout=2) as sock:
             with context.wrap_socket(sock, server_hostname=safe_target) as ssock:
                 ver = ssock.version()
@@ -4048,6 +4097,12 @@ def get_compliance_check_data(target):
                         "message": f"TLS Encryption Standard: FAIL (Deprecated Protocol: {ver})",
                         "timestamp": datetime.now().strftime("%H:%M:%S")
                     })
+    except ssl.SSLCertVerificationError as e:
+         findings.append({
+            "category": "Cryptography", "tool": "IITM-POL-002", "severity": "High",
+            "message": f"TLS Encryption Standard: FAIL (SSL Verification Error: {str(e)})",
+            "timestamp": datetime.now().strftime("%H:%M:%S")
+        })
     except:
          # Check if HTTP is open
          if socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex((safe_target, 80)) == 0:
@@ -4089,7 +4144,7 @@ def get_compliance_check_data(target):
     if has_ssl or socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex((safe_target, 80)) == 0:
         try:
             url = f"https://{safe_target}" if has_ssl else f"http://{safe_target}"
-            r = requests.get(url, timeout=2, verify=False)
+            r = requests.get(url, timeout=2, verify=True)
             h = r.headers
             missing = []
             if "Strict-Transport-Security" not in h and has_ssl: missing.append("HSTS (HTTP Strict Transport Security)")
