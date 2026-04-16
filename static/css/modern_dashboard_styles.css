@@ -6,7 +6,7 @@
     
     --text-primary: #2d3748; /* Dark Grey for Headings */
     --text-secondary: #4a5568; /* Medium Grey for text */
-    --text-muted: #718096; /* Light Grey for small text */
+    --text-muted: #4b5563; /* Darker Grey for better contrast on white */
     
     /* Brand Colors - Professional Blue Theme */
     --brand-primary: #0f172a; /* Slate 900 (Dark) */
@@ -268,7 +268,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Fix visibility for text-muted on white */
 .text-muted {
-    color: #64748b !important; /* Slightly darker grey for better contrast */
+    color: var(--text-muted) !important; /* Use the updated darker grey for better contrast */
 }
 
 /* Ensure light text on dark backgrounds */
