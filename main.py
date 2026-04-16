@@ -2510,27 +2510,23 @@ def generate_professional_pdf_report(target, data_input=None, title="Security As
     pdf.ln(5)
     
     # Risk Summary Calculation
-    critical = len([f for f in findings if f.get('severity') == 'Critical'])
-    high = len([f for f in findings if f.get('severity') == 'High'])
-    medium = len([f for f in findings if f.get('severity') == 'Medium'])
-    low = len([f for f in findings if f.get('severity') == 'Low'])
-    info = len([f for f in findings if f.get('severity') == 'Info'])
+    counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0, "Info": 0}
+    active_hosts = 0
+    is_network_monitor = "Network Monitor" in title
     
-    counts = {
-        "Critical": critical,
-        "High": high,
-        "Medium": medium,
-        "Low": low,
-        "Info": info
-    }
+    for f in findings:
+        sev = f.get('severity')
+        if sev in counts:
+            counts[sev] += 1
+        if is_network_monitor and "Host:" in f.get('message', ''):
+            active_hosts += 1
     
     # Draw Visual Chart
     pdf.draw_risk_chart(counts)
     
     # Network Monitor Specific Stats
-    if "Network Monitor" in title:
-        active_hosts = len([f for f in findings if "Host:" in f.get('message', '')])
-        risky_hosts = len([f for f in findings if f.get('severity') in ['Critical', 'High']])
+    if is_network_monitor:
+        risky_hosts = counts["Critical"] + counts["High"]
         
         pdf.ln(5)
         pdf.set_fill_color(240, 248, 255)
