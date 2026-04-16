@@ -345,27 +345,35 @@ def run_command_stream(cmd_list):
         yield f"Error running command: {str(e)}"
 
 def get_clean_ldap_attr(entry, attr_name, default=""):
-    if attr_name not in entry:
-        return default
-    
-    # Get the attribute object
-    attr = entry[attr_name]
-    
-    # In ldap3, we usually look at .value
-    if hasattr(attr, 'value'):
-        val = attr.value
-    else:
-        val = attr # Fallback if mocked or simple dict
-        
-    if isinstance(val, list) or isinstance(val, (tuple, set)):
-        if len(val) > 0:
-            return str(val[0])
-        return default
-    
-    if val is None:
-        return default
-        
-    return str(val)
+    try:
+        # Use getattr to satisfy the task's rationale.
+        # ldap3 Entry objects support both attr.name and attr['name']
+        try:
+            attr = getattr(entry, attr_name)
+        except (AttributeError, TypeError):
+            attr = entry[attr_name]
+
+        if not attr:
+            return default
+
+        # In ldap3, we usually look at .value
+        if hasattr(attr, 'value'):
+            val = attr.value
+        else:
+            val = attr
+
+        if isinstance(val, (list, tuple, set)):
+            if len(val) > 0:
+                return str(val[0])
+            return default
+
+        if val is None:
+            return default
+
+        return str(val)
+    except Exception:
+        pass
+    return default
 
 def authenticate_ldap(username, password):
     """
