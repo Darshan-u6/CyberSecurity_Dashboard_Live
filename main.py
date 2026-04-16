@@ -3045,7 +3045,8 @@ def run_scan_job(req_id, scan_type, target):
                 c.execute("UPDATE requests SET status = %s WHERE id = %s", (msg, req_id))
                 conn.commit()
                 conn.close()
-            except: pass
+            except Exception as e:
+                print(f"DB Update Error (Status Helper): {e}")
 
         if scan_type == "VAPT":
             scan_title = "Vulnerability Assessment & Penetration Testing Report"
@@ -3171,7 +3172,8 @@ def run_scan_job(req_id, scan_type, target):
             c.execute("UPDATE requests SET status = 'Failed' WHERE id = %s", (req_id,))
             conn.commit()
             conn.close()
-        except: pass
+        except Exception as e:
+            print(f"DB Update Error (Failed Status): {e}")
 
 def generate_request_report(request_data, filename, scan_output):
     os.makedirs("reports", exist_ok=True)
