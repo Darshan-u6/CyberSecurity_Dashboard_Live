@@ -43,7 +43,7 @@
     </style>
 </head>
 
-<body>
+<body class="bg-dark text-white">
 
 <!-- Loading Overlay -->
 <div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:2000; justify-content:center; align-items:center; flex-direction:column;">
@@ -182,30 +182,7 @@
                             <div class="position-absolute w-100 h-100 bg-grid-pattern opacity-25"></div>
                             <div class="live-logs-container p-3 position-relative z-1 overflow-auto" id="dashThreatLog" style="height: 300px;">
                                 <!-- Live logs populate here -->
-                                <div class="log-entry d-flex align-items-start mb-3 border-start border-danger border-3 ps-2">
-                                    <div class="text-danger mt-1 me-2"><i class="fas fa-exclamation-triangle"></i></div>
-                                    <div>
-                                        <div class="text-white text-sm">Unauthorized access attempt</div>
-                                        <div class="text-muted" style="font-size: 0.65rem;">IP: 192.168.1.45 | Port: 22</div>
-                                    </div>
-                                    <div class="ms-auto text-muted" style="font-size: 0.6rem;">Just now</div>
-                                </div>
-                                <div class="log-entry d-flex align-items-start mb-3 border-start border-warning border-3 ps-2">
-                                    <div class="text-warning mt-1 me-2"><i class="fas fa-shield-alt"></i></div>
-                                    <div>
-                                        <div class="text-white text-sm">Malware signature detected</div>
-                                        <div class="text-muted" style="font-size: 0.65rem;">File: payload.exe</div>
-                                    </div>
-                                    <div class="ms-auto text-muted" style="font-size: 0.6rem;">2 min ago</div>
-                                </div>
-                                <div class="log-entry d-flex align-items-start mb-3 border-start border-info border-3 ps-2">
-                                    <div class="text-info mt-1 me-2"><i class="fas fa-info-circle"></i></div>
-                                    <div>
-                                        <div class="text-white text-sm">System configuration updated</div>
-                                        <div class="text-muted" style="font-size: 0.65rem;">User: admin</div>
-                                    </div>
-                                    <div class="ms-auto text-muted" style="font-size: 0.6rem;">15 min ago</div>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -227,20 +204,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>10.0.0.1 - 10.0.0.50</td>
-                                <td>Network Monitor</td>
-                                <td><span class="badge bg-success bg-opacity-25 text-success border border-success rounded-pill">Running</span></td>
-                                <td>00:45:12</td>
-                                <td><span class="text-warning"><i class="fas fa-circle" style="font-size: 0.5rem;"></i> Medium</span></td>
-                            </tr>
-                            <tr>
-                                <td>web-portal.local</td>
-                                <td>VAPT Scan</td>
-                                <td><span class="badge bg-info bg-opacity-25 text-info border border-info rounded-pill">Initializing</span></td>
-                                <td>00:01:05</td>
-                                <td><span class="text-secondary"><i class="fas fa-circle" style="font-size: 0.5rem;"></i> Unknown</span></td>
-                            </tr>
+
                         </tbody>
                     </table>
                 </div>

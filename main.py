@@ -2792,31 +2792,8 @@ def generate_compliance_pdf_report(target, data_input):
     return report_path
 
 def generate_generic_pdf_report(target, data_input, scan_type):
-    os.makedirs("reports", exist_ok=True)
-    safe_target = "".join(c for c in target if c.isalnum() or c in ".-_")
-    
-    pdf = ProfessionalPDF()
-    pdf.alias_nb_pages()
-    pdf.add_page()
-    
-    pdf.ln(40)
-    pdf.set_font("Arial", 'B', 24)
-    pdf.cell(0, 15, f"{scan_type} Report", 0, 1, 'C')
-    pdf.set_font("Arial", '', 14)
-    pdf.cell(0, 10, f"Target: {target}", 0, 1, 'C')
-    
-    pdf.ln(20)
-    pdf.chapter_title("Scan Results")
-    
-    content = "".join(str(x) for x in data_input)
-    safe_content = content.encode('latin-1', 'replace').decode('latin-1')
-    
-    pdf.set_font("Courier", '', 9)
-    pdf.multi_cell(0, 5, safe_content[:10000]) # Limit
-    
-    report_path = f"reports/Report_{safe_target}_{scan_type.replace(' ', '_')}.pdf"
-    pdf.output(report_path)
-    return report_path
+    # Route all generic generation to the enhanced professional enterprise format.
+    return generate_professional_pdf_report(target, data_input=data_input, title=f"{scan_type} Assessment Report")
 
 
 @app.get("/download-log/{filename}")

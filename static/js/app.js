@@ -1572,16 +1572,36 @@ function handleReportAction(id, action) {
 function updateDashboardStats() {
     // Fetch Real Data from /dashboard/stats
     secureFetch('/dashboard/stats').then(r => r.json()).then(d => {
-        document.getElementById('reportsCount').innerText = d.completed_reports;
-        document.getElementById('dash_active_scans').innerText = d.active_scans;
-        document.getElementById('dash_intrusions').innerText = d.intrusions;
+        // Fallback checks for old UI components
+        if(document.getElementById('reportsCount')) document.getElementById('reportsCount').innerText = d.completed_reports;
+        if(document.getElementById('dash_active_scans')) document.getElementById('dash_active_scans').innerText = d.active_scans;
+        if(document.getElementById('dash_intrusions')) document.getElementById('dash_intrusions').innerText = d.intrusions;
         
+        // Update new Modern UI Gauges dynamically (Risk derived from Subnet Health / Threats from intrusions / Scans from active/completed)
+        let totalScore = 0;
+        if (d.subnet_health && d.subnet_health.length > 0) {
+            d.subnet_health.forEach(s => totalScore += s.score);
+            totalScore = Math.floor(totalScore / d.subnet_health.length);
+        } else {
+            totalScore = 95; // Default safe if no subnets parsed
+        }
+
+        const riskScore = 100 - totalScore; // Risk is inverse of health
+        const activeThreats = d.intrusions;
+        const totalScans = d.completed_reports + d.active_scans;
+        
+        // Call the global function defined in index.html
+        if (window.updateDashboardGauges) {
+            window.updateDashboardGauges(riskScore, activeThreats, totalScans);
+        }
+
         const threatEl = document.getElementById('dash_threat_level');
-        threatEl.innerText = d.threat_level;
-        
-        if (d.threat_level === "HIGH") threatEl.className = "mb-0 text-danger pulse";
-        else if (d.threat_level === "ELEVATED") threatEl.className = "mb-0 text-warning";
-        else threatEl.className = "mb-0 text-success";
+        if (threatEl) {
+            threatEl.innerText = d.threat_level;
+            if (d.threat_level === "HIGH") threatEl.className = "mb-0 text-danger pulse";
+            else if (d.threat_level === "ELEVATED") threatEl.className = "mb-0 text-warning";
+            else threatEl.className = "mb-0 text-success";
+        }
         
         // Subnet Health
         const deptBody = document.getElementById('dept_status_body');
