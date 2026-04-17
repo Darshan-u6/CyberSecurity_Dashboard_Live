@@ -56,9 +56,9 @@
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
     <div class="sidebar-header d-flex flex-column align-items-center text-center py-4">
-        <div class="brand-icon mb-2"><i class="fas fa-shield-alt text-cyan" style="font-size: 2rem; color: #00f3ff;"></i></div>
-        <h6 class="mb-0 sidebar-brand-text fw-bold" style="color: #fff; letter-spacing: 1px;">CYBER SEC</h6>
-        <small style="color: #00f3ff; font-size: 0.7rem; text-transform: uppercase;">Operations</small>
+        <div class="brand-icon mb-2"><img src="/static/img/iitm_logo.png" alt="IITM Logo" style="width: 50px; height: auto; background: white; border-radius: 50%; padding: 2px; border: 2px solid #00f3ff;"></div>
+        <h6 class="mb-0 sidebar-brand-text fw-bold mt-2" style="color: #fff; letter-spacing: 1px;">IIT MADRAS</h6>
+        <small style="color: #00f3ff; font-size: 0.65rem; text-transform: uppercase; font-weight: bold;">Cyber Security Operations</small>
     </div>
     <div class="list-group list-group-flush mt-2 w-100 px-2 sidebar-nav">
         <a href="#" onclick="showSection('dashboard')" class="nav-link active rounded mb-1"><i class="fas fa-th-large me-2"></i> Dashboard</a>
@@ -160,13 +160,13 @@
                 <div class="col-lg-8">
                     <div class="glass-panel rounded p-4 h-100">
                         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-2">
-                            <h6 class="text-white text-uppercase fw-bold mb-0" style="letter-spacing: 1px;"><i class="fas fa-chart-line text-cyan me-2"></i> Network Traffic & Anomalies</h6>
+                            <h6 class="text-white text-uppercase fw-bold mb-0" style="letter-spacing: 1px;"><i class="fas fa-shield-alt text-cyan me-2"></i> Vulnerability Distribution</h6>
                             <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-secondary text-white dropdown-toggle" type="button" data-bs-toggle="dropdown">Last 7 Days</button>
+                                <button class="btn btn-sm btn-outline-secondary text-white dropdown-toggle" type="button" data-bs-toggle="dropdown">IITM Network</button>
                             </div>
                         </div>
                         <div style="height: 300px;">
-                            <canvas id="trafficChart"></canvas>
+                            <canvas id="vulnDistributionChart"></canvas>
                         </div>
                     </div>
                 </div>
