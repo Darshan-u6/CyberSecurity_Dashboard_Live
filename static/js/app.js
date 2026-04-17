@@ -628,6 +628,9 @@ function runVAPT() {
     
     streamJson(`/vapt-scan?target=${target}`, (data) => {
         if (data.type === 'finding') {
+            if (data.message) {
+                data.message = data.message.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
             let borderClass = 'border-start border-4 border-info';
             let bgClass = 'bg-white';
             let badgeClass = 'bg-info text-dark';
