@@ -651,9 +651,6 @@ def virus_scan(target: str, user: dict = Depends(get_current_admin)):
                     "severity": sig['severity']
                 }
             }) + "\n"
-            # Visual pacing
-            time.sleep(0.02)
-
         # 2. Advanced Heuristic Analysis (Backdoor Check)
         yield json.dumps({"type": "status", "message": "Running Heuristic Backdoor Analysis..."}) + "\n"
         
@@ -945,21 +942,33 @@ def scan_ports(ip: str, ports: str, user: dict = Depends(get_current_admin)):
                         
         except PermissionError:
              yield json.dumps({"type": "warning", "message": "Root required for SYN Scan. Falling back to Standard Connect."}) + "\n"
-             # Fallback: Python Socket Connect Scan
-             for port in ports_list:
+             # Fallback: Python Socket Connect Scan (Concurrent)
+             import concurrent.futures
+
+             def check_port_connect(port):
                  try:
                      with socket.create_connection((safe_ip, port), timeout=0.5):
-                        service = "unknown"
-                        try: service = socket.getservbyport(port)
-                        except: pass
-                        result = {"port": str(port), "state": "open", "service": f"{service} (tcp-connect)"}
-                        open_ports_list.append(f"{port}/{service}")
-                        
-                        ts = datetime.now().strftime("%H:%M:%S")
-                        findings.append({"tool": "Port Scanner", "category": "Port Scanning", "severity": "Info", "message": f"Port Open: {port}/{service} (tcp-connect)", "timestamp": ts})
-                        
-                        yield json.dumps({"type": "result", "data": result}) + "\n"
-                 except: pass
+                         service = "unknown"
+                         try: service = socket.getservbyport(port)
+                         except: pass
+                         return port, service
+                 except:
+                     return None
+
+             with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+                 future_to_port = {executor.submit(check_port_connect, port): port for port in ports_list}
+                 for future in concurrent.futures.as_completed(future_to_port):
+                     res = future.result()
+                     if res:
+                         port, service = res
+                         result = {"port": str(port), "state": "open", "service": f"{service} (tcp-connect)"}
+                         open_ports_list.append(f"{port}/{service}")
+
+                         ts = datetime.now().strftime("%H:%M:%S")
+                         findings.append({"tool": "Port Scanner", "category": "Port Scanning", "severity": "Info", "message": f"Port Open: {port}/{service} (tcp-connect)", "timestamp": ts})
+
+                         yield json.dumps({"type": "result", "data": result}) + "\n"
+
                  
         except Exception as e:
              # Scapy might fail for other reasons (no routes, etc)

@@ -315,3 +315,93 @@ h1, h2, h3, h4, h5, h6 {
 .fade-in-up {
     animation: fadeInUp 0.5s ease-out both;
 }
+
+/* CYBER SEC DARK UI THEME OVERRIDES */
+:root {
+    --bg-dark-primary: #0a0e17;
+    --bg-dark-secondary: #111827;
+    --text-primary: #f9fafb;
+    --text-muted: #9ca3af;
+    --cyan-accent: #00f3ff;
+    --purple-accent: #a855f7;
+    --danger-accent: #ef4444;
+}
+
+body {
+    background-color: var(--bg-dark-primary);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+}
+
+/* Sidebar overriding */
+.sidebar {
+    background-color: var(--bg-dark-secondary) !important;
+    border-right: 1px solid #1f2937 !important;
+}
+
+.sidebar .nav-link {
+    color: var(--text-muted) !important;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+}
+
+.sidebar .nav-link:hover, .sidebar .nav-link.active {
+    color: var(--cyan-accent) !important;
+    background-color: rgba(0, 243, 255, 0.05);
+    border-left: 3px solid var(--cyan-accent);
+}
+
+/* Glass Panels */
+.glass-panel {
+    background-color: var(--bg-dark-secondary);
+    border: 1px solid #1f2937;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+}
+
+.bg-dark-alpha {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Utilities */
+.text-cyan {
+    color: var(--cyan-accent) !important;
+}
+
+.bg-gradient-cyan {
+    background: linear-gradient(135deg, #00f3ff 0%, #0284c7 100%);
+}
+
+.hover-cyan:hover {
+    color: var(--cyan-accent) !important;
+    cursor: pointer;
+}
+
+.bg-grid-pattern {
+    background-image: linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-dark-primary);
+}
+::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--cyan-accent);
+}
+
+/* Inputs and Tables */
+.table-dark {
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.02);
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.05);
+    --bs-table-color: var(--text-primary);
+}
