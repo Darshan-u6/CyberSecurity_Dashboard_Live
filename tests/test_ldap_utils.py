@@ -71,3 +71,42 @@ def test_get_clean_ldap_attr_error_handling():
 def test_get_clean_ldap_attr_none_value():
     entry = {"cn": None}
     assert get_clean_ldap_attr(entry, "cn", default="None Default") == "None Default"
+
+def test_get_clean_ldap_attr_empty_list_value_property():
+    class MockEmptyListAttr:
+        @property
+        def value(self):
+            return []
+        def __bool__(self):
+            return True
+
+    class Entry:
+        def __init__(self):
+            self.attr = MockEmptyListAttr()
+        # Ensure it works with both attribute access and item access logic
+        def __getitem__(self, item):
+            raise KeyError(item)
+        def __contains__(self, item):
+            return False
+
+    entry = Entry()
+    assert get_clean_ldap_attr(entry, "attr", default="Default") == "Default"
+
+def test_get_clean_ldap_attr_none_value_property():
+    class MockNoneAttr:
+        @property
+        def value(self):
+            return None
+        def __bool__(self):
+            return True
+
+    class Entry:
+        def __init__(self):
+            self.attr = MockNoneAttr()
+        def __getitem__(self, item):
+            raise KeyError(item)
+        def __contains__(self, item):
+            return False
+
+    entry = Entry()
+    assert get_clean_ldap_attr(entry, "attr", default="Default") == "Default"
