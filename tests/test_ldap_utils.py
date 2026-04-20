@@ -1,18 +1,19 @@
 import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from unittest.mock import MagicMock
 
 # Mock dependencies that are not available in the environment
 mock_modules = [
-    'fastapi', 'fastapi.responses', 'fastapi.middleware.cors', 'fastapi.staticfiles',
-    'fastapi.security', 'pydantic', 'mysql', 'mysql.connector', 'fpdf', 'passlib', 'passlib.context',
-    'ldap3', 'ldap3.utils', 'ldap3.utils.conv', 'uvicorn', 'requests', 'scapy', 'scapy.all', 'jose', 'starlette', 'starlette.middleware.base', 'packaging'
+    'mysql', 'mysql.connector', 'fpdf', 'passlib', 'passlib.context',
+    'ldap3', 'ldap3.utils', 'ldap3.utils.conv', 'requests', 'scapy', 'scapy.all', 'jose', 'packaging'
 ]
 
 for module in mock_modules:
     m = MagicMock()
     sys.modules[module] = m
     # Special handling for packages
-    if module in ['ldap3', 'mysql', 'fastapi', 'passlib', 'scapy', 'starlette']:
+    if module in ['ldap3', 'mysql', 'passlib', 'scapy']:
         m.__path__ = []
 
 # Now we can import from main
