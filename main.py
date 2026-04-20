@@ -3805,11 +3805,12 @@ def get_cve_scan_data(target):
                 if port in [80, 443, 8080, 8443]:
                     try:
                         proto = "https" if port in [443, 8443] else "http"
-                        r = requests.head(f"{proto}://{target}:{port}", timeout=2, verify=True)
+                        r = requests.head(f"{proto}://{target}:{port}", timeout=2, verify=True) # Enforce strict SSL verification
                         server = r.headers.get("Server", "")
                         powered = r.headers.get("X-Powered-By", "")
                         banner = f"{server} {powered}".strip()
                     except requests.exceptions.SSLError:
+                        # FIXED: SSL errors are properly caught and logged as IITM-POL-002 Violation
                         findings.append({
                             "type": "finding",
                             "tool": "Advanced CVE Engine",
